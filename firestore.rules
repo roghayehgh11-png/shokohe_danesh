@@ -1,0 +1,97 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128;
+    }
+
+    match /test/{testId} {
+      allow get: if isValidId(testId);
+      allow list: if true;
+      allow write: if isValidId(testId);
+    }
+
+    match /users/{userId} {
+      allow get: if isValidId(userId);
+      allow list: if true;
+      allow write: if isValidId(userId);
+    }
+
+    match /courses/{courseId} {
+      allow get: if isValidId(courseId);
+      allow list: if true;
+      allow write: if isValidId(courseId);
+    }
+
+    match /projects/{projectId} {
+      allow get: if isValidId(projectId);
+      allow list: if true;
+      allow write: if isValidId(projectId);
+    }
+
+    match /dailyReports/{reportId} {
+      allow get: if isValidId(reportId);
+      allow list: if true;
+      allow write: if isValidId(reportId);
+    }
+
+    match /customerLeads/{leadId} {
+      allow get: if isValidId(leadId);
+      allow list: if true;
+      allow write: if isValidId(leadId);
+    }
+
+    match /tuitions/{tuitionId} {
+      allow get: if isValidId(tuitionId);
+      allow list: if true;
+      allow write: if isValidId(tuitionId);
+    }
+
+    match /payments/{paymentId} {
+      allow get: if isValidId(paymentId);
+      allow list: if true;
+      allow write: if isValidId(paymentId);
+    }
+
+    match /installments/{installmentId} {
+      allow get: if isValidId(installmentId);
+      allow list: if true;
+      allow write: if isValidId(installmentId);
+    }
+
+    match /expenses/{expenseId} {
+      allow get: if isValidId(expenseId);
+      allow list: if true;
+      allow write: if isValidId(expenseId);
+    }
+
+    match /teacherSalaries/{salaryId} {
+      allow get: if isValidId(salaryId);
+      allow list: if true;
+      allow write: if isValidId(salaryId);
+    }
+
+    match /groupLinks/{linkId} {
+      allow get: if isValidId(linkId);
+      allow list: if true;
+      allow write: if isValidId(linkId);
+    }
+
+    match /notifications/{notificationId} {
+      allow get: if isValidId(notificationId);
+      allow list: if true;
+      allow write: if isValidId(notificationId);
+    }
+
+    match /activityLogs/{logId} {
+      allow get: if isValidId(logId);
+      allow list: if true;
+      allow write: if isValidId(logId);
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

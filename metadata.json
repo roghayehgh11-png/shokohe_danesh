@@ -1,6 +1,6 @@
 {
-  "name": "سامانه مدیریت آموزشگاه شکوه دانش",
-  "description": "اپلیکیشن اختصاصی و حرفه ای مدریت آموزشگاه شکوه دانش",
+  "name": "سامانه مدیریت آکادمی شکوه دانش",
+  "description": "سامانه جامع و اختصاصی مدیریت آکادمی شکوه دانش (shoukoh danesh)",
   "requestFramePermissions": [],
   "majorCapabilities": [
     "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"

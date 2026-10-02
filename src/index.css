@@ -1,33 +1,41 @@
 @import "tailwindcss";
 
+/* ۱. دریافت فونت وزیرمتن با تمام وزن‌ها از گوگل‌فونت */
+@import url('https://fonts.googleapis.com/css2?family=Vazirmatn:wght@100..900&display=swap');
+
 @custom-variant dark (&:where(.dark, .dark *));
 
-@layer base {
-  :root {
-    font-family: 'Vazirmatn', 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'IranSans', 'Sahel', 'Samim', sans-serif;
-    font-feature-settings: 'cv01', 'ss01';
-    text-rendering: optimizeLegibility;
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
-  }
-
-  html, body, #root {
-    height: 100%;
-    width: 100%;
-    margin: 0;
-    padding: 0;
-    overflow-x: hidden;
-    font-family: inherit;
-    letter-spacing: -0.01em;
-  }
+/* ۲. تنظیم متغیرهای فونت Tailwind v4 */
+@theme {
+  --font-sans: 'Vazirmatn', 'Plus Jakarta Sans', system-ui, sans-serif;
 }
 
-/* Smooth and responsive scrolling */
-* {
+/* ۳. اعمال اجباری روی کل عناصر و ریشه پروژه */
+:root {
+  --default-font-family: 'Vazirmatn', 'Plus Jakarta Sans', system-ui, sans-serif !important;
+  font-family: 'Vazirmatn', 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+  font-feature-settings: 'cv01', 'ss01';
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+html, body, #root {
+  height: 100%;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden;
+  font-family: 'Vazirmatn', 'Plus Jakarta Sans', system-ui, sans-serif !important;
+  letter-spacing: -0.01em;
+}
+
+*, ::after, ::before {
+  font-family: inherit;
   -webkit-overflow-scrolling: touch;
 }
 
-/* Custom scrollbar for clean UI */
+/* اسکرول‌بار سفارشی */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -45,5 +53,3 @@
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(107, 114, 128, 0.6);
 }
-
-

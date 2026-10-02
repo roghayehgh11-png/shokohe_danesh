@@ -3,6 +3,7 @@
   "appId": "1:544592936470:web:648ccbe12dfcaed9cbbf37",
   "apiKey": "AIzaSyDyK9r_LsLPOXZQnU2R5aCYfd_AZcrxRY8",
   "authDomain": "shokohe-danesh.firebaseapp.com",
+  "firestoreDatabaseId": "(default)",
   "storageBucket": "shokohe-danesh.firebasestorage.app",
   "messagingSenderId": "544592936470",
   "measurementId": "G-V9GTDEGBWQ"

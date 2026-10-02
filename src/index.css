@@ -1,22 +1,30 @@
-@import "tailwindcss";
-
-/* ۱. دانلود مستقیم و بدون فیلتر فونت وزیرمتن از CDN معتبر */
+/* ۱. ابتدا فراخوانی فونت از CDN (حتماً باید بالای import tailwind باشد) */
 @import url('https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-Variable-font-face.css');
+
+/* ۲. فراخوانی اصلی Tailwind CSS v4 */
+@import "tailwindcss";
 
 @custom-variant dark (&:where(.dark, .dark *));
 
-/* ۲. تنظیم فونت در Tailwind CSS v4 */
+/* ۳. تنظیم فونت در Tailwind CSS v4 */
 @theme {
-  --font-sans: 'Vazirmatn', system-ui, sans-serif;
+  --font-sans: 'Vazirmatn', system-ui, -apple-system, sans-serif;
 }
 
-/* ۳. اعمال اجباری فونت روی تمام عناصر */
+/* ۴. ریست و اعمال اجباری فونت روی کل عناصر */
 :root {
   --default-font-family: 'Vazirmatn', system-ui, sans-serif !important;
 }
 
 *, html, body, #root, button, input, select, textarea {
   font-family: 'Vazirmatn', system-ui, -apple-system, BlinkMacSystemFont, sans-serif !important;
+}
+
+/* اصلاح ریسپونسیو تصاویر */
+img, video {
+  max-width: 100%;
+  height: auto;
+  display: block;
 }
 
 /* اسکرول‌بار سفارشی */

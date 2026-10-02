@@ -1,12 +1,9 @@
 {
-  "projectId": "reverberant-rhythm-wzp2g",
-  "appId": "1:1004935484228:web:876a7e4aaf4b463fda3d11",
-  "apiKey": "AIzaSyCC8ASfHp45fyJBVN77o2yQAFEbLkHZC2k",
-  "authDomain": "reverberant-rhythm-wzp2g.firebaseapp.com",
-  "firestoreDatabaseId": "ai-studio-19fae20e-dad6-4c62-8163-f3457627b53f",
-  "storageBucket": "reverberant-rhythm-wzp2g.firebasestorage.app",
-  "messagingSenderId": "1004935484228",
-  "measurementId": "",
-  "oAuthClientId": "1004935484228-rfd7qrjn9cq6miqdegveo426girtj03k.apps.googleusercontent.com",
-  "recaptchaSiteKey": ""
+  "projectId": "shokohe-danesh",
+  "appId": "1:544592936470:web:648ccbe12dfcaed9cbbf37",
+  "apiKey": "AIzaSyDyK9r_LsLPOXZQnU2R5aCYfd_AZcrxRY8",
+  "authDomain": "shokohe-danesh.firebaseapp.com",
+  "storageBucket": "shokohe-danesh.firebasestorage.app",
+  "messagingSenderId": "544592936470",
+  "measurementId": "G-V9GTDEGBWQ"
 }

@@ -16,10 +16,7 @@ import {
   Calendar as CalendarIcon,
   Clock,
   Database,
-  Sparkles,
-  Cloud,
   RefreshCw,
-  CheckCircle2,
   X
 } from 'lucide-react';
 
@@ -35,7 +32,6 @@ export const Header: React.FC = () => {
     logout,
     cloudSyncStatus,
     lastSyncTime,
-    syncNow,
     refreshDatabases
   } = useApp();
 
@@ -47,6 +43,12 @@ export const Header: React.FC = () => {
   const [isBackupOpen, setIsBackupOpen] = useState(false);
   const [isNotifOpen, setIsNotifOpen] = useState(false);
   const [isRoleDropdownOpen, setIsRoleDropdownOpen] = useState(false);
+
+  // دریافت هوشمند آدرس لوگو از پارامترهای URL یا مسیر نسبی
+  const getLogoUrl = () => {
+    const urlParams = new URLSearchParams(window.location.search);
+    return urlParams.get('logo_url') || './app-logo.jpg';
+  };
 
   // Live Persian Date and Time
   const [liveDateInfo, setLiveDateInfo] = useState<PersianFullDateInfo>(() => getPersianFullDateInfo());
@@ -74,7 +76,6 @@ export const Header: React.FC = () => {
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Support Ctrl+K, Cmd+K on both English and Persian keyboards (where 'k' is 'ن' or keyCode 75)
       const isKKey = e.key?.toLowerCase() === 'k' || e.key === 'ن' || e.code === 'KeyK' || e.keyCode === 75;
       if ((e.ctrlKey || e.metaKey) && isKKey) {
         e.preventDefault();
@@ -96,11 +97,11 @@ export const Header: React.FC = () => {
           <div className="flex items-center gap-2 sm:hidden shrink-0">
             <div className="w-8 h-8 rounded-full overflow-hidden bg-white p-0.5 border border-slate-700 shadow-sm flex items-center justify-center">
               <img
-                src="/app-logo.jpg"
+                src={getLogoUrl()}
                 alt="لوگوی رمز دانش"
                 className="w-full h-full object-contain rounded-full"
                 onError={(e) => {
-                  e.currentTarget.src = '/src/assets/images/ramz_danesh_logo_1790837789382.jpg';
+                  e.currentTarget.style.display = 'none';
                 }}
               />
             </div>
@@ -152,7 +153,7 @@ export const Header: React.FC = () => {
                 ? 'bg-amber-50 dark:bg-amber-950/50 border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-300'
                 : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-blue-50 dark:hover:bg-slate-700 hover:text-blue-600 dark:hover:text-blue-400 hover:border-blue-300'
             }`}
-            title={`رفرش دیتابیس‌ها و به‌روزرسانی اطلاعات${lastSyncTime ? ` (آخرین رفرش: ${lastSyncTime})` : ''}`}
+            title={`رفرش دیتابیس‌ها و به‌‌روزرسانی اطلاعات${lastSyncTime ? ` (آخرین رفرش: ${lastSyncTime})` : ''}`}
           >
             <RefreshCw
               className={`w-3.5 h-3.5 ${
@@ -219,7 +220,7 @@ export const Header: React.FC = () => {
                         key={u.id}
                         onClick={() => {
                           setCurrentUser(u);
-                          localStorage.setItem('shokooh_danesh_prod_v1_auth_user_id', u.id);
+                          localStorage.setItem('ramz_danesh_prod_v1_auth_user_id', u.id);
                           if (u.role === 'intern') setActiveModule('daily_reports');
                           else if (u.role === 'student' || u.role === 'teacher') setActiveModule('courses');
                           else setActiveModule('dashboard');
@@ -336,4 +337,3 @@ export const Header: React.FC = () => {
     </>
   );
 };
-

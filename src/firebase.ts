@@ -1,29 +1,19 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
 import { initializeFirestore, getFirestore, doc, getDocFromServer } from 'firebase/firestore';
-
-// کلیدهای واقعی پروژه جدید Firebase شما (shokohe-danesh)
-const firebaseConfig = {
-  apiKey: "AIzaSyDyK9r_LsLPOXZQnU2R5aCYfd_AZcrxRY8",
-  authDomain: "shokohe-danesh.firebaseapp.com",
-  projectId: "shokohe-danesh",
-  storageBucket: "shokohe-danesh.firebasestorage.app",
-  messagingSenderId: "544592936470",
-  appId: "1:544592936470:web:648ccbe12dfcaed9cbbf37",
-  measurementId: "G-V9GTDEGBWQ"
-};
+import firebaseConfig from '../firebase-applet-config.json';
 
 // Initialize Firebase App
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 
-// Initialize Firestore (استفاده از دیتابیس استاندارد پروژه به همراه Long Polling برای شبکه‌های ایران/محدود)
+// CRITICAL: Initialize Firestore with databaseId from config and enable force long polling for rock-solid cloud connectivity
 let firestoreInstance;
 try {
   firestoreInstance = initializeFirestore(app, {
-    experimentalAutoDetectLongPolling: true,
-  });
+    experimentalForceLongPolling: true,
+  }, firebaseConfig.firestoreDatabaseId);
 } catch {
-  firestoreInstance = getFirestore(app);
+  firestoreInstance = getFirestore(app, firebaseConfig.firestoreDatabaseId);
 }
 
 export const db = firestoreInstance;

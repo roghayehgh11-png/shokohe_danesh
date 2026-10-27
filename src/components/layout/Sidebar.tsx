@@ -9,10 +9,13 @@ import {
   FileCheck,
   DollarSign,
   BarChart3,
+  MessageSquare,
   Share2,
   Bell,
   Settings,
-  LogOut
+  GraduationCap,
+  LogOut,
+  ExternalLink
 } from 'lucide-react';
 
 interface NavItem {
@@ -29,12 +32,6 @@ export const Sidebar: React.FC = () => {
   const pendingReportsCount = dailyReports.filter(r => r.status === 'submitted').length;
   const newLeadsCount = customerLeads.filter(l => l.status === 'new_lead').length;
   const unreadNotifsCount = notifications.filter(n => !n.read).length;
-
-  // دریافت هوشمند آدرس لوگو از پارامترهای URL یا مسیر نسبی
-  const getLogoUrl = () => {
-    const urlParams = new URLSearchParams(window.location.search);
-    return urlParams.get('logo_url') || './app-logo.jpg';
-  };
 
   let navItems: NavItem[] = [];
 
@@ -60,6 +57,7 @@ export const Sidebar: React.FC = () => {
       { id: 'notifications', label: 'اعلان‌ها و رویدادها', icon: Bell, badgeCount: unreadNotifsCount > 0 ? unreadNotifsCount : undefined }
     ];
   } else if (currentUser.role === 'intern') {
+    // Intern has exactly 4 items
     navItems = [
       { id: 'daily_reports', label: 'ثبت و پیگیری گزارش روزانه', icon: FileCheck },
       { id: 'projects', label: 'پروژه‌های من', icon: FolderKanban },
@@ -67,6 +65,7 @@ export const Sidebar: React.FC = () => {
       { id: 'notifications', label: 'اعلان‌ها و رویدادها', icon: Bell, badgeCount: unreadNotifsCount > 0 ? unreadNotifsCount : undefined }
     ];
   } else {
+    // Student has exactly 3 items
     navItems = [
       { id: 'courses', label: 'دوره‌ها و کلاس‌های من', icon: BookOpen },
       { id: 'messages', label: 'پیام‌رسان‌ها و گروه‌ها', icon: Share2 },
@@ -82,12 +81,12 @@ export const Sidebar: React.FC = () => {
       <div className="p-4 border-b border-slate-800 flex items-center gap-3">
         <div className="w-10 h-10 rounded-full overflow-hidden shrink-0 bg-white p-0.5 shadow-md border-2 border-slate-700 flex items-center justify-center">
           <img
-            src={getLogoUrl()}
+            src="/app-logo.jpg"
             alt="لوگوی رسمی آکادمی رمز دانش"
             className="w-full h-full object-contain rounded-full"
             referrerPolicy="no-referrer"
             onError={(e) => {
-              e.currentTarget.style.display = 'none';
+              e.currentTarget.src = '/src/assets/images/ramz_danesh_logo_1790837789382.jpg';
             }}
           />
         </div>

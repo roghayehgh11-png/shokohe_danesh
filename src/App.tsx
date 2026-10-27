@@ -1,10 +1,10 @@
-import React, { useMemo } from 'react';
+import React from 'react';
 import { AppProvider, useApp } from './context/AppContext';
 import { Header } from './components/layout/Header';
 import { Sidebar } from './components/layout/Sidebar';
 import { GlobalSearchModal } from './components/common/GlobalSearchModal';
 import { LoginScreen } from './components/auth/LoginScreen';
-import { ShieldAlert, ArrowRight, Loader2 } from 'lucide-react';
+import { ShieldAlert, ArrowRight } from 'lucide-react';
 
 // Modules
 import { DashboardModule } from './components/modules/DashboardModule';
@@ -28,19 +28,15 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
 const MainLayout: React.FC = () => {
   const { activeModule, setActiveModule, currentUser } = useApp();
 
-  // جلوگیری از رندر مجدد و ساخت دوباره allowedModules در هر فریم با useMemo
-  const allowedModules = useMemo(() => {
-    return ROLE_PERMISSIONS[currentUser?.role || 'student'] || ['courses'];
-  }, [currentUser?.role]);
-
+  const allowedModules = ROLE_PERMISSIONS[currentUser.role] || ['courses'];
   const isModuleAllowed = allowedModules.includes(activeModule);
 
-  // Auto redirect در صورت غیرمجاز بودن بخش فعال
+  // Auto redirect if current activeModule is not allowed for role
   React.useEffect(() => {
     if (!allowedModules.includes(activeModule)) {
       setActiveModule(allowedModules[0] as any);
     }
-  }, [activeModule, allowedModules, setActiveModule]);
+  }, [currentUser.role, activeModule, allowedModules, setActiveModule]);
 
   const renderActiveModule = () => {
     if (!isModuleAllowed) {
@@ -55,7 +51,7 @@ const MainLayout: React.FC = () => {
                 عدم داشتن سطح دسترسی مجاز
               </h3>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                نقش فعلی شما ({currentUser?.role === 'teacher' ? 'مدرس' : currentUser?.role === 'intern' ? 'کارآموز' : currentUser?.role === 'student' ? 'دانشجو' : 'مهمان'}) مجوز مشاهده این بخش را ندارد.
+                نقش فعلی شما ({currentUser.role === 'teacher' ? 'مدرس' : currentUser.role === 'intern' ? 'کارآموز' : currentUser.role === 'student' ? 'دانشجو' : 'مهمان'}) مجوز مشاهده این بخش را ندارد.
               </p>
             </div>
             <button
@@ -117,17 +113,7 @@ const MainLayout: React.FC = () => {
 };
 
 const AppContent: React.FC = () => {
-  const { isAuthenticated, loading } = useApp() as any;
-
-  // اگر Context در حال دریافت داده اولیه یا وضعیت فایربیس باشد
-  if (loading) {
-    return (
-      <div className="h-screen w-full flex flex-col items-center justify-center bg-slate-50 dark:bg-slate-950 text-slate-600 dark:text-slate-300 gap-3" dir="rtl">
-        <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
-        <span className="text-sm font-medium">در حال بارگذاری اطلاعات...</span>
-      </div>
-    );
-  }
+  const { isAuthenticated } = useApp();
 
   if (!isAuthenticated) {
     return <LoginScreen />;

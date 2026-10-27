@@ -22,7 +22,9 @@ import {
   NotificationTarget,
   GroupLink,
   GroupPlatform,
-  GroupAudienceType
+  GroupAudienceType,
+  LeadPhone,
+  CallLogItem
 } from '../types';
 import { evaluateProjectStageFromReports } from '../utils/geminiReportService';
 import { generateCourseCode, normalizeCourseTitle } from '../utils/dateUtils';
@@ -106,6 +108,7 @@ interface AppContextType {
   deleteCustomerLead: (id: string) => void;
   updateLeadStatus: (id: string, status: LeadStatus, cancellationReason?: string) => void;
   addLeadNote: (leadId: string, noteText: string) => void;
+  addLeadCallLog: (leadId: string, log: Omit<CallLogItem, 'id'>) => void;
   convertLeadToStudent: (leadId: string, courseId: string) => void;
 
   // Financial Actions
@@ -156,25 +159,37 @@ interface AppContextType {
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
-const LOCAL_STORAGE_KEY = 'shokooh_danesh_prod_v1';
+const LOCAL_STORAGE_KEY = 'shokooh_danesh_prod_v2';
+
+function loadLocalData<T>(key: string, defaultValue: T): T {
+  try {
+    const raw = localStorage.getItem(`${LOCAL_STORAGE_KEY}_${key}`);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(defaultValue)) {
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed as unknown as T;
+      } else if (parsed && typeof parsed === 'object') {
+        return parsed as T;
+      }
+    }
+  } catch (e) {
+    console.warn(`[Local Storage] Failed to load ${key}:`, e);
+  }
+  return defaultValue;
+}
+
+function saveLocalData<T>(key: string, data: T) {
+  try {
+    localStorage.setItem(`${LOCAL_STORAGE_KEY}_${key}`, JSON.stringify(data));
+  } catch (e) {
+    console.warn(`[Local Storage] Failed to save ${key}:`, e);
+  }
+}
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [users, setUsers] = useState<User[]>(() => {
-    return initialUsers.map(u => {
-      if (u.id === 'u-1' || u.name.includes('علی هاشمی')) {
-        return { ...u, username: u.username || 'ali_hashemi', password: u.password || '123' };
-      }
-      if (u.id === 'u-2' || u.name.includes('سارا راد')) {
-        return { ...u, username: u.username || 'sara_rad', password: u.password || '123' };
-      }
-      if (u.id === 'u-3' || u.name.includes('رضا کرمی')) {
-        return { ...u, username: u.username || 'reza_karami', password: u.password || '123' };
-      }
-      if (u.id === 'u-4' || u.name.includes('مینا احمدی')) {
-        return { ...u, username: u.username || 'mina_ahmadi', password: u.password || '123' };
-      }
-      return { ...u, password: u.password || '123' };
-    });
+    const fallback = initialUsers.map(u => ({ ...u, password: u.password || '123' }));
+    return loadLocalData('users', fallback);
   });
 
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
@@ -185,15 +200,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [currentUser, setCurrentUser] = useState<User>(() => {
     const savedUserId = localStorage.getItem(`${LOCAL_STORAGE_KEY}_auth_user_id`);
     if (savedUserId) {
-      const found = initialUsers.find(u => u.id === savedUserId);
+      const found = users.find(u => u.id === savedUserId) || initialUsers.find(u => u.id === savedUserId);
       if (found) return found;
     }
-    return initialUsers[0];
+    return users[0] || initialUsers[0];
   });
 
   const [courses, setCourses] = useState<Course[]>(() => {
     const existingCodes: string[] = [];
-    return initialCourses.map(c => {
+    const fallback = initialCourses.map(c => {
       if (c.code) {
         existingCodes.push(c.code);
         return c;
@@ -202,34 +217,121 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       existingCodes.push(generated);
       return { ...c, code: generated };
     });
+    return loadLocalData('courses', fallback);
   });
 
-  const [projects, setProjects] = useState<Project[]>(initialProjects);
-  const [dailyReports, setDailyReports] = useState<DailyReport[]>(initialDailyReports);
-  const [customerLeads, setCustomerLeads] = useState<CustomerLead[]>(initialCustomerLeads);
-  const [tuitions, setTuitions] = useState<TuitionRecord[]>(initialTuitions);
-  const [payments, setPayments] = useState<PaymentTransaction[]>(initialPayments);
-  const [installments, setInstallments] = useState<InstallmentPlan[]>(initialInstallments);
-  const [expenses, setExpenses] = useState<ExpenseRecord[]>(initialExpenses);
-  const [teacherSalaries, setTeacherSalaries] = useState<TeacherSalaryRecord[]>(initialTeacherSalaries);
+  const [projects, setProjects] = useState<Project[]>(() => loadLocalData('projects', initialProjects));
+  const [dailyReports, setDailyReports] = useState<DailyReport[]>(() => loadLocalData('dailyReports', initialDailyReports));
+  const [customerLeads, setCustomerLeads] = useState<CustomerLead[]>(() => loadLocalData('customerLeads', initialCustomerLeads));
+  const [tuitions, setTuitions] = useState<TuitionRecord[]>(() => loadLocalData('tuitions', initialTuitions));
+  const [payments, setPayments] = useState<PaymentTransaction[]>(() => loadLocalData('payments', initialPayments));
+  const [installments, setInstallments] = useState<InstallmentPlan[]>(() => loadLocalData('installments', initialInstallments));
+  const [expenses, setExpenses] = useState<ExpenseRecord[]>(() => loadLocalData('expenses', initialExpenses));
+  const [teacherSalaries, setTeacherSalaries] = useState<TeacherSalaryRecord[]>(() => loadLocalData('teacherSalaries', initialTeacherSalaries));
   const [chatChannels] = useState<ChatChannel[]>(initialChatChannels);
   const [messages, setMessages] = useState<ChatMessage[]>(initialMessages);
-  const [activityLogs, setActivityLogs] = useState<ActivityLog[]>(initialActivityLogs);
-  const [notifications, setNotifications] = useState<SystemNotification[]>(initialNotifications);
-  const [groupLinks, setGroupLinks] = useState<GroupLink[]>(initialGroupLinks);
+  const [activityLogs, setActivityLogs] = useState<ActivityLog[]>(() => loadLocalData('activityLogs', initialActivityLogs));
+  const [notifications, setNotifications] = useState<SystemNotification[]>(() => loadLocalData('notifications', initialNotifications));
+  const [groupLinks, setGroupLinks] = useState<GroupLink[]>(() => loadLocalData('groupLinks', initialGroupLinks));
 
   const [activeModule, setActiveModule] = useState<ActiveModule>('dashboard');
   const [searchQuery, setSearchQuery] = useState('');
 
+  // Auto-persist all collections locally
+  useEffect(() => { saveLocalData('users', users); }, [users]);
+  useEffect(() => { saveLocalData('courses', courses); }, [courses]);
+  useEffect(() => { saveLocalData('projects', projects); }, [projects]);
+  useEffect(() => { saveLocalData('dailyReports', dailyReports); }, [dailyReports]);
+  useEffect(() => { saveLocalData('customerLeads', customerLeads); }, [customerLeads]);
+  useEffect(() => { saveLocalData('tuitions', tuitions); }, [tuitions]);
+  useEffect(() => { saveLocalData('payments', payments); }, [payments]);
+  useEffect(() => { saveLocalData('installments', installments); }, [installments]);
+  useEffect(() => { saveLocalData('expenses', expenses); }, [expenses]);
+  useEffect(() => { saveLocalData('teacherSalaries', teacherSalaries); }, [teacherSalaries]);
+  useEffect(() => { saveLocalData('activityLogs', activityLogs); }, [activityLogs]);
+  useEffect(() => { saveLocalData('notifications', notifications); }, [notifications]);
+  useEffect(() => { saveLocalData('groupLinks', groupLinks); }, [groupLinks]);
+
   // ==========================================
-  // REAL-TIME FIRESTORE SYNCHRONIZATION
-  // Connects all institute collections directly to Firebase Firestore
+  // REAL-TIME FIRESTORE & CENTRAL SERVER SYNCHRONIZATION
+  // Connects all institute collections to Central DB & Firebase Firestore
   // ==========================================
-  const [cloudSyncStatus, setCloudSyncStatus] = useState<'synced' | 'syncing' | 'offline' | 'error'>('syncing');
+  const [cloudSyncStatus, setCloudSyncStatus] = useState<'synced' | 'syncing' | 'offline' | 'error'>('synced');
   const [lastSyncTime, setLastSyncTime] = useState<string>(() => {
     return new Date().toLocaleTimeString('fa-IR', { hour: '2-digit', minute: '2-digit' });
   });
   const [serverVersion, setServerVersion] = useState<number>(1);
+
+  // Debounced server background sync (so every device/browser stays synchronized)
+  const syncTimeoutRef = useRef<any>(null);
+  const isCloudInitializedRef = useRef<boolean>(false);
+
+  useEffect(() => {
+    // Prevent stale localStorage state from overwriting the cloud/server database on initial mount
+    if (!isCloudInitializedRef.current) {
+      return;
+    }
+
+    if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current);
+    syncTimeoutRef.current = setTimeout(() => {
+      fetch('/api/sync/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          data: {
+            users,
+            courses,
+            projects,
+            dailyReports,
+            customerLeads,
+            tuitions,
+            payments,
+            installments,
+            expenses,
+            teacherSalaries,
+            groupLinks,
+            notifications,
+            activityLogs
+          }
+        })
+      })
+        .then(res => res.json())
+        .then(res => {
+          if (res?.success && res.version) {
+            setServerVersion(res.version);
+            setLastSyncTime(new Date().toLocaleTimeString('fa-IR', { hour: '2-digit', minute: '2-digit' }));
+          }
+        })
+        .catch(() => {});
+    }, 2000);
+
+    return () => {
+      if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current);
+    };
+  }, [users, courses, projects, dailyReports, customerLeads, tuitions, payments, installments, expenses, teacherSalaries, groupLinks, notifications, activityLogs]);
+
+  // Initial Central Server State Fetch
+  useEffect(() => {
+    fetch('/api/sync/state')
+      .then(res => res.json())
+      .then(res => {
+        if (res?.success && res.hasData && res.data) {
+          const d = res.data;
+          if (Array.isArray(d.courses) && d.courses.length > 0) setCourses(d.courses);
+          if (Array.isArray(d.customerLeads) && d.customerLeads.length > 0) setCustomerLeads(d.customerLeads);
+          if (Array.isArray(d.users) && d.users.length > 0) setUsers(d.users);
+          if (Array.isArray(d.projects) && d.projects.length > 0) setProjects(d.projects);
+          if (Array.isArray(d.dailyReports) && d.dailyReports.length > 0) setDailyReports(d.dailyReports);
+          if (Array.isArray(d.tuitions) && d.tuitions.length > 0) setTuitions(d.tuitions);
+          if (Array.isArray(d.payments) && d.payments.length > 0) setPayments(d.payments);
+          if (Array.isArray(d.installments) && d.installments.length > 0) setInstallments(d.installments);
+          if (Array.isArray(d.expenses) && d.expenses.length > 0) setExpenses(d.expenses);
+          if (Array.isArray(d.teacherSalaries) && d.teacherSalaries.length > 0) setTeacherSalaries(d.teacherSalaries);
+          if (Array.isArray(d.groupLinks) && d.groupLinks.length > 0) setGroupLinks(d.groupLinks);
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   // Firestore Real-Time Subscriptions on Mount
   useEffect(() => {
@@ -262,95 +364,110 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           activityLogs: initialActivityLogs
         });
 
-        // 1. Users real-time listener
+        // 1. Users real-time listener (reflects additions, edits, and deletions across all devices)
         const unsubUsers = subscribeToCollection<User>('users', (data) => {
-          if (!isMounted || !data || data.length === 0) return;
+          if (!isMounted || !Array.isArray(data)) return;
           setUsers(data);
-          setCurrentUser(prev => data.find(u => u.id === prev.id) || prev);
+          if (data.length > 0) {
+            setCurrentUser(prev => data.find(u => u.id === prev.id) || prev || data[0]);
+          }
+          isCloudInitializedRef.current = true;
         });
         unsubscribers.push(unsubUsers);
 
         // 2. Courses real-time listener
         const unsubCourses = subscribeToCollection<Course>('courses', (data) => {
-          if (!isMounted || !data || data.length === 0) return;
+          if (!isMounted || !Array.isArray(data)) return;
           setCourses(data);
+          isCloudInitializedRef.current = true;
         });
         unsubscribers.push(unsubCourses);
 
         // 3. Projects real-time listener
         const unsubProjects = subscribeToCollection<Project>('projects', (data) => {
-          if (!isMounted || !data || data.length === 0) return;
+          if (!isMounted || !Array.isArray(data)) return;
           setProjects(data);
+          isCloudInitializedRef.current = true;
         });
         unsubscribers.push(unsubProjects);
 
         // 4. Daily Reports real-time listener
         const unsubReports = subscribeToCollection<DailyReport>('dailyReports', (data) => {
-          if (!isMounted || !data || data.length === 0) return;
+          if (!isMounted || !Array.isArray(data)) return;
           setDailyReports(data);
+          isCloudInitializedRef.current = true;
         });
         unsubscribers.push(unsubReports);
 
         // 5. Customer Leads real-time listener
         const unsubLeads = subscribeToCollection<CustomerLead>('customerLeads', (data) => {
-          if (!isMounted || !data || data.length === 0) return;
+          if (!isMounted || !Array.isArray(data)) return;
           setCustomerLeads(data);
+          isCloudInitializedRef.current = true;
         });
         unsubscribers.push(unsubLeads);
 
         // 6. Tuitions real-time listener
         const unsubTuitions = subscribeToCollection<TuitionRecord>('tuitions', (data) => {
-          if (!isMounted || !data || data.length === 0) return;
+          if (!isMounted || !Array.isArray(data)) return;
           setTuitions(data);
+          isCloudInitializedRef.current = true;
         });
         unsubscribers.push(unsubTuitions);
 
         // 7. Payments real-time listener
         const unsubPayments = subscribeToCollection<PaymentTransaction>('payments', (data) => {
-          if (!isMounted || !data || data.length === 0) return;
+          if (!isMounted || !Array.isArray(data)) return;
           setPayments(data);
+          isCloudInitializedRef.current = true;
         });
         unsubscribers.push(unsubPayments);
 
         // 8. Installments real-time listener
         const unsubInstallments = subscribeToCollection<InstallmentPlan>('installments', (data) => {
-          if (!isMounted || !data || data.length === 0) return;
+          if (!isMounted || !Array.isArray(data)) return;
           setInstallments(data);
+          isCloudInitializedRef.current = true;
         });
         unsubscribers.push(unsubInstallments);
 
         // 9. Expenses real-time listener
         const unsubExpenses = subscribeToCollection<ExpenseRecord>('expenses', (data) => {
-          if (!isMounted || !data || data.length === 0) return;
+          if (!isMounted || !Array.isArray(data)) return;
           setExpenses(data);
+          isCloudInitializedRef.current = true;
         });
         unsubscribers.push(unsubExpenses);
 
         // 10. Teacher Salaries real-time listener
         const unsubSalaries = subscribeToCollection<TeacherSalaryRecord>('teacherSalaries', (data) => {
-          if (!isMounted || !data || data.length === 0) return;
+          if (!isMounted || !Array.isArray(data)) return;
           setTeacherSalaries(data);
+          isCloudInitializedRef.current = true;
         });
         unsubscribers.push(unsubSalaries);
 
         // 11. Group Links real-time listener
         const unsubLinks = subscribeToCollection<GroupLink>('groupLinks', (data) => {
-          if (!isMounted || !data || data.length === 0) return;
+          if (!isMounted || !Array.isArray(data)) return;
           setGroupLinks(data);
+          isCloudInitializedRef.current = true;
         });
         unsubscribers.push(unsubLinks);
 
         // 12. Notifications real-time listener
         const unsubNotifications = subscribeToCollection<SystemNotification>('notifications', (data) => {
-          if (!isMounted || !data || data.length === 0) return;
+          if (!isMounted || !Array.isArray(data)) return;
           setNotifications(data);
+          isCloudInitializedRef.current = true;
         });
         unsubscribers.push(unsubNotifications);
 
         // 13. Activity Logs real-time listener
         const unsubLogs = subscribeToCollection<ActivityLog>('activityLogs', (data) => {
-          if (!isMounted || !data || data.length === 0) return;
+          if (!isMounted || !Array.isArray(data)) return;
           setActivityLogs(data);
+          isCloudInitializedRef.current = true;
         });
         unsubscribers.push(unsubLogs);
 
@@ -826,16 +943,46 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // CRM Leads
   const addCustomerLead = (leadData: Omit<CustomerLead, 'id' | 'createdAt' | 'notes' | 'status'>) => {
+    const today = new Date().toLocaleDateString('fa-IR');
     const newLead: CustomerLead = {
       ...leadData,
       id: `lead-${Date.now()}`,
       status: 'new_lead',
       notes: [],
-      createdAt: new Date().toLocaleDateString('fa-IR')
+      referralDate: leadData.referralDate || leadData.visitDate || today,
+      lastCallDate: leadData.lastCallDate || today,
+      callLogs: leadData.callLogs || (leadData.lastCallDate ? [{
+        id: `call-${Date.now()}`,
+        date: leadData.lastCallDate,
+        callerName: currentUser.name,
+        result: 'ثبت تماس اولیه در CRM',
+        note: 'ثبت پرونده متقاضی جدید'
+      }] : []),
+      createdAt: today
     };
     setCustomerLeads(prev => [newLead, ...prev]);
     saveDocumentInFirestore('customerLeads', newLead);
     logActivity('ثبت مخاطب جدید CRM', 'CRM', `ثبت پرونده مشتری ${newLead.fullName}`);
+  };
+
+  const addLeadCallLog = (leadId: string, log: Omit<CallLogItem, 'id'>) => {
+    const newCall: CallLogItem = {
+      ...log,
+      id: `call-${Date.now()}`
+    };
+    setCustomerLeads(prev => prev.map(l => {
+      if (l.id === leadId) {
+        const up = {
+          ...l,
+          lastCallDate: newCall.date,
+          callLogs: [newCall, ...(l.callLogs || [])]
+        };
+        saveDocumentInFirestore('customerLeads', up);
+        return up;
+      }
+      return l;
+    }));
+    logActivity('ثبت تماس تلفنی CRM', 'CRM', `ثبت تماس با نتیجه «${newCall.result}» برای مخاطب ${leadId}`);
   };
 
   const updateCustomerLead = (id: string, updated: Partial<CustomerLead>) => {
@@ -1505,6 +1652,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         deleteCustomerLead,
         updateLeadStatus,
         addLeadNote,
+        addLeadCallLog,
         convertLeadToStudent,
         addTuition,
         updateTuition,

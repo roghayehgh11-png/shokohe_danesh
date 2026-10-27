@@ -41,7 +41,9 @@ import {
   ExternalLink,
   Share2,
   Hash,
-  Sparkles
+  Sparkles,
+  Briefcase,
+  Award
 } from 'lucide-react';
 
 export const CoursesModule: React.FC = () => {
@@ -56,6 +58,7 @@ export const CoursesModule: React.FC = () => {
   const [teacherActiveTab, setTeacherActiveTab] = useState<'courses' | 'students'>('courses');
   const [courseSearchQuery, setCourseSearchQuery] = useState('');
   const [studentSearchQuery, setStudentSearchQuery] = useState('');
+  const [courseTypeFilter, setCourseTypeFilter] = useState<'all' | 'academic' | 'internship'>('all');
 
   // Helper to normalize teacher names for clean comparison (removes honorifics like استاد/مهندس)
   const normalizeTeacherName = (name?: string) => {
@@ -95,15 +98,21 @@ export const CoursesModule: React.FC = () => {
     return true;
   });
 
-  // Filter courses by search query (title, code, teacher, category)
+  // Filter courses by type (all / academic / internship) and search query
   const filteredVisibleCourses = visibleCourses.filter(course => {
+    const isInternship = course.courseType === 'internship' || course.category === 'internship' || (course.category || '').includes('کارآموزی');
+    if (courseTypeFilter === 'academic' && isInternship) return false;
+    if (courseTypeFilter === 'internship' && !isInternship) return false;
+
     if (!courseSearchQuery.trim()) return true;
     const q = courseSearchQuery.trim().toLowerCase();
     const matchesTitle = (course.title || '').toLowerCase().includes(q);
     const matchesCode = (course.code || '').toLowerCase().includes(q);
     const matchesTeacher = (course.teacherName || '').toLowerCase().includes(q);
     const matchesCategory = (course.category || '').toLowerCase().includes(q);
-    return matchesTitle || matchesCode || matchesTeacher || matchesCategory;
+    const matchesCompany = (course.partnerCompany || '').toLowerCase().includes(q);
+    const matchesMentor = (course.mentorName || '').toLowerCase().includes(q);
+    return matchesTitle || matchesCode || matchesTeacher || matchesCategory || matchesCompany || matchesMentor;
   });
 
   // Calculate teacher's enrolled students
@@ -123,6 +132,14 @@ export const CoursesModule: React.FC = () => {
   const [newTeacherPassword, setNewTeacherPassword] = useState('123');
 
   // Course Form State
+  const [courseType, setCourseType] = useState<'academic' | 'internship'>('academic');
+  const [partnerCompany, setPartnerCompany] = useState('');
+  const [mentorName, setMentorName] = useState('');
+  const [stipendOrTuitionType, setStipendOrTuitionType] = useState<'free' | 'stipend_paid' | 'tuition_fee'>('stipend_paid');
+  const [stipendAmount, setStipendAmount] = useState(1500000);
+  const [internshipTasks, setInternshipTasks] = useState('');
+  const [certificateEligibility, setCertificateEligibility] = useState(true);
+
   const [courseCode, setCourseCode] = useState('');
   const [title, setTitle] = useState('');
   const [category, setCategory] = useState<string>('برنامه‌نویسی پایتون');
@@ -169,10 +186,18 @@ export const CoursesModule: React.FC = () => {
     setNewTeacherUsername('');
   };
 
-  const handleOpenModal = (course?: Course) => {
+  const handleOpenModal = (course?: Course, initialType?: 'academic' | 'internship') => {
     setDuplicateError(null);
     if (course) {
       setEditingCourseId(course.id);
+      setCourseType(course.courseType || (course.category === 'internship' ? 'internship' : 'academic'));
+      setPartnerCompany(course.partnerCompany || '');
+      setMentorName(course.mentorName || '');
+      setStipendOrTuitionType(course.stipendOrTuitionType || 'stipend_paid');
+      setStipendAmount(course.stipendAmount !== undefined ? course.stipendAmount : 1500000);
+      setInternshipTasks(course.internshipTasks ? course.internshipTasks.join('، ') : '');
+      setCertificateEligibility(course.certificateEligibility !== undefined ? course.certificateEligibility : true);
+
       setCourseCode(course.code || generateCourseCode(course.startDate || getTodayPersianDate(), courses.map(c => c.code), course.id));
       setTitle(course.title);
       setCategory(course.category);
@@ -193,26 +218,35 @@ export const CoursesModule: React.FC = () => {
       setDescription(course.description);
     } else {
       setEditingCourseId(null);
+      const isIntern = initialType === 'internship';
+      setCourseType(isIntern ? 'internship' : 'academic');
+      setPartnerCompany(isIntern ? 'شرکت فناوری و توسعه نرم‌افزار آکادمی' : '');
+      setMentorName(isIntern ? (activeTeachers[0]?.name || 'مهندس شایان حسینی') : '');
+      setStipendOrTuitionType('stipend_paid');
+      setStipendAmount(1500000);
+      setInternshipTasks(isIntern ? 'توسعه ماژول‌های وب، اتصال به API، رفع باگ، تدوین مستندات و گزارش روزانه' : '');
+      setCertificateEligibility(true);
+
       const range1405 = getPersianYearEndRange(1405);
       const initialCode = generateCourseCode(range1405.startDate, courses.map(c => c.code));
       setCourseCode(initialCode);
-      setTitle('');
-      setCategory('برنامه‌نویسی پایتون');
+      setTitle(isIntern ? 'دوره کارآموزی توسعه وب و ورود به بازار کار' : '');
+      setCategory(isIntern ? 'کارآموزی و ورود به بازار کار' : 'برنامه‌نویسی پایتون');
       setTeacherId(activeTeachers[0]?.id || '');
-      setManualTeacherName('');
+      setManualTeacherName(isIntern ? (activeTeachers[0]?.name || 'مهندس سرپرست کارآموزی') : '');
       setUseManualTeacher(false);
-      setCapacity(15);
-      setScheduleDays('روزهای زوج (شنبه، دوشنبه، چهارشنبه)');
+      setCapacity(isIntern ? 8 : 15);
+      setScheduleDays(isIntern ? 'شنبه تا چهارشنبه (ساعات اداری)' : 'روزهای زوج (شنبه، دوشنبه، چهارشنبه)');
       setCustomDays(['شنبه', 'دوشنبه', 'چهارشنبه']);
       setCustomDatesInput('');
       setStartDate(range1405.startDate);
       setEndDate(range1405.endDate);
       setIsScheduleCustomMode(false);
-      setScheduleTime('17:00 - 19:00');
-      setRoom('سایت شماره ۱');
-      setPrice(5500000);
-      setTeacherWage(2000000);
-      setDescription('');
+      setScheduleTime(isIntern ? '09:00 - 15:00' : '17:00 - 19:00');
+      setRoom(isIntern ? 'اتاق کار اشتراکی کارآموزان' : 'سایت شماره ۱');
+      setPrice(isIntern ? 0 : 5500000);
+      setTeacherWage(isIntern ? 3000000 : 2000000);
+      setDescription(isIntern ? 'دوره جامع کارآموزی عملی و پروژه‌محور با هدف ارتقای تجربه و اتصال مستقیم به موقعیت‌های شغلی.' : '');
     }
     setIsModalOpen(true);
   };
@@ -336,6 +370,13 @@ export const CoursesModule: React.FC = () => {
       code: finalCode,
       title,
       category: category as CourseCategory,
+      courseType,
+      partnerCompany: courseType === 'internship' ? partnerCompany : undefined,
+      mentorName: courseType === 'internship' ? mentorName : undefined,
+      stipendOrTuitionType: courseType === 'internship' ? stipendOrTuitionType : undefined,
+      stipendAmount: courseType === 'internship' ? stipendAmount : undefined,
+      internshipTasks: courseType === 'internship' && internshipTasks ? internshipTasks.split(/[،,]+/).map(s => s.trim()).filter(Boolean) : undefined,
+      certificateEligibility: courseType === 'internship' ? certificateEligibility : undefined,
       teacherId: finalTeacherId,
       teacherName: finalTeacherName,
       capacity,
@@ -513,24 +554,70 @@ export const CoursesModule: React.FC = () => {
         </div>
 
         {currentUser.role === 'admin' && (
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <button
               onClick={() => setIsTeacherModalOpen(true)}
-              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl shadow flex items-center gap-2 transition-all shrink-0"
+              className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl shadow flex items-center gap-2 transition-all shrink-0"
             >
               <UserCheck className="w-4 h-4" />
               ثبت مدرس جدید
             </button>
 
             <button
-              onClick={() => handleOpenModal()}
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs rounded-xl shadow-lg shadow-blue-500/30 flex items-center gap-2 transition-all shrink-0"
+              onClick={() => handleOpenModal(undefined, 'academic')}
+              className="px-3.5 py-2 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs rounded-xl shadow-md flex items-center gap-2 transition-all shrink-0"
             >
               <PlusCircle className="w-4 h-4" />
-              تعریف دوره جدید
+              تعریف کلاس آموزشی
+            </button>
+
+            <button
+              onClick={() => handleOpenModal(undefined, 'internship')}
+              className="px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-black text-xs rounded-xl shadow-lg shadow-purple-500/25 flex items-center gap-2 transition-all shrink-0"
+            >
+              <Briefcase className="w-4 h-4" />
+              + افزودن دوره کارآموزی
             </button>
           </div>
         )}
+      </div>
+
+      {/* Course Type Filter Tabs (All / Academic / Internship) */}
+      <div className="flex items-center gap-2 bg-white dark:bg-slate-900 p-2 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-xs flex-wrap">
+        <button
+          onClick={() => setCourseTypeFilter('all')}
+          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+            courseTypeFilter === 'all'
+              ? 'bg-blue-600 text-white shadow-sm'
+              : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+          }`}
+        >
+          همه دوره‌ها ({courses.length})
+        </button>
+
+        <button
+          onClick={() => setCourseTypeFilter('academic')}
+          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+            courseTypeFilter === 'academic'
+              ? 'bg-blue-600 text-white shadow-sm'
+              : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+          }`}
+        >
+          <BookOpen className="w-3.5 h-3.5" />
+          کلاس‌های آموزشی ({courses.filter(c => c.courseType !== 'internship' && c.category !== 'internship' && !(c.category || '').includes('کارآموزی')).length})
+        </button>
+
+        <button
+          onClick={() => setCourseTypeFilter('internship')}
+          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+            courseTypeFilter === 'internship'
+              ? 'bg-purple-600 text-white shadow-sm'
+              : 'text-purple-600 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-950/40'
+          }`}
+        >
+          <Briefcase className="w-3.5 h-3.5" />
+          دوره‌های کارآموزی ({courses.filter(c => c.courseType === 'internship' || c.category === 'internship' || (c.category || '').includes('کارآموزی')).length})
+        </button>
       </div>
 
       {/* TEACHER STUDENTS TAB */}
@@ -661,15 +748,22 @@ export const CoursesModule: React.FC = () => {
                     <div className="space-y-3">
                       <div className="flex items-start justify-between gap-2">
                         <div className="flex items-center gap-1.5 flex-wrap">
-                          <span className="px-2.5 py-1 rounded-lg text-[10px] font-extrabold bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-blue-300 border border-blue-200/60 dark:border-blue-800">
-                            {course.category === 'scratch' ? 'اسکرچ کودکان' :
-                             course.category === 'wordpress' ? 'طراحی سایت وردپرس' :
-                             course.category === 'python' ? 'برنامه‌نویسی پایتون' :
-                             course.category === 'seo' ? 'سئو تخصصی' :
-                             course.category === 'programming' ? 'برنامه‌نویسی عمومی' :
-                             course.category === 'icdl' ? 'مهارت‌های هفتگانه ICDL' :
-                             course.category}
-                          </span>
+                          {(course.courseType === 'internship' || course.category === 'internship' || (course.category || '').includes('کارآموزی')) ? (
+                            <span className="px-2.5 py-1 rounded-lg text-[10px] font-black bg-purple-100 dark:bg-purple-950 text-purple-700 dark:text-purple-300 border border-purple-300 dark:border-purple-800 flex items-center gap-1 shadow-xs">
+                              <Briefcase className="w-3 h-3 text-purple-600" />
+                              دوره کارآموزی
+                            </span>
+                          ) : (
+                            <span className="px-2.5 py-1 rounded-lg text-[10px] font-extrabold bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-blue-300 border border-blue-200/60 dark:border-blue-800">
+                              {course.category === 'scratch' ? 'اسکرچ کودکان' :
+                               course.category === 'wordpress' ? 'طراحی سایت وردپرس' :
+                               course.category === 'python' ? 'برنامه‌نویسی پایتون' :
+                               course.category === 'seo' ? 'سئو تخصصی' :
+                               course.category === 'programming' ? 'برنامه‌نویسی عمومی' :
+                               course.category === 'icdl' ? 'مهارت‌های هفتگانه ICDL' :
+                               course.category}
+                            </span>
+                          )}
 
                           {course.code && (
                             <span
@@ -727,6 +821,31 @@ export const CoursesModule: React.FC = () => {
                           </span>
                         )}
                       </div>
+
+                      {course.partnerCompany && (
+                        <div className="flex items-center gap-1.5 text-purple-900 dark:text-purple-300 font-bold bg-purple-50/70 dark:bg-purple-950/40 p-2 rounded-xl border border-purple-200 dark:border-purple-800/60 text-[11px]">
+                          <Building2 className="w-3.5 h-3.5 text-purple-600 shrink-0" />
+                          <span>شرکت همکار: <strong>{course.partnerCompany}</strong></span>
+                        </div>
+                      )}
+
+                      {course.mentorName && (
+                        <div className="flex items-center gap-1.5 text-slate-700 dark:text-slate-300 text-[11px]">
+                          <Award className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
+                          <span>منتور کارآموزی: <strong>{course.mentorName}</strong></span>
+                        </div>
+                      )}
+
+                      {(course.courseType === 'internship' || course.stipendOrTuitionType) && (
+                        <div className="flex items-center justify-between text-[11px] bg-slate-50 dark:bg-slate-800 p-2 rounded-xl border border-slate-200/60 dark:border-slate-700/60">
+                          <span className="text-slate-500 font-bold">وضعیت مالی کارآموزی:</span>
+                          <span className="font-extrabold text-purple-700 dark:text-purple-300">
+                            {course.stipendOrTuitionType === 'free' ? 'بورسیه رایگان آکادمی' :
+                             course.stipendOrTuitionType === 'stipend_paid' ? `کمک‌هزینه: ${(course.stipendAmount || 0).toLocaleString('fa-IR')} ت/ماه` :
+                             `شهریه: ${(course.price || 0).toLocaleString('fa-IR')} تومان`}
+                          </span>
+                        </div>
+                      )}
 
                       <div className="flex items-center gap-2 text-slate-600 dark:text-slate-300 font-semibold">
                         <Clock className="w-4 h-4 text-blue-500 shrink-0" />
@@ -928,9 +1047,23 @@ export const CoursesModule: React.FC = () => {
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 overflow-y-auto p-3 sm:p-6 flex items-start sm:items-center justify-center">
           <div className="bg-white dark:bg-slate-900 rounded-2xl max-w-xl w-full p-5 sm:p-6 border border-slate-200 dark:border-slate-800 shadow-2xl max-h-[90vh] flex flex-col my-auto animate-scale-up">
             <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3 shrink-0">
-              <h3 className="font-bold text-base text-slate-900 dark:text-white">
-                {editingCourseId ? 'ویرایش دوره آموزشی' : 'تعریف دوره جدید'}
-              </h3>
+              <div className="flex items-center gap-2">
+                <span className={`p-1.5 rounded-xl ${courseType === 'internship' ? 'bg-purple-100 dark:bg-purple-950 text-purple-600 dark:text-purple-300' : 'bg-blue-100 dark:bg-blue-950 text-blue-600 dark:text-blue-300'}`}>
+                  {courseType === 'internship' ? <Briefcase className="w-5 h-5" /> : <BookOpen className="w-5 h-5" />}
+                </span>
+                <div>
+                  <h3 className="font-extrabold text-base text-slate-900 dark:text-white">
+                    {editingCourseId
+                      ? (courseType === 'internship' ? 'ویرایش دوره کارآموزی' : 'ویرایش دوره آموزشی')
+                      : (courseType === 'internship' ? 'تعریف دوره کارآموزی جدید' : 'تعریف کلاس آموزشی جدید')}
+                  </h3>
+                  <p className="text-[11px] text-slate-400">
+                    {courseType === 'internship'
+                      ? 'ثبت مشخصات دوره کارآموزی، شرکت همکار، منتور و شرایط جذب'
+                      : 'ثبت اطلاعات کلاس، استاد، زمان‌بندی و شهریه'}
+                  </p>
+                </div>
+              </div>
               <button
                 type="button"
                 onClick={() => setIsModalOpen(false)}
@@ -949,15 +1082,151 @@ export const CoursesModule: React.FC = () => {
                 </div>
               )}
 
+              {/* Course Type Switcher */}
+              <div className="p-1.5 bg-slate-100 dark:bg-slate-800 rounded-xl flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCourseType('academic');
+                    if (!editingCourseId && category === 'کارآموزی و ورود به بازار کار') {
+                      setCategory('برنامه‌نویسی پایتون');
+                    }
+                  }}
+                  className={`flex-1 py-2 rounded-lg font-bold text-xs transition-all flex items-center justify-center gap-1.5 ${
+                    courseType === 'academic'
+                      ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-sm'
+                      : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+                  }`}
+                >
+                  <BookOpen className="w-4 h-4" />
+                  <span>کلاس آموزشی استاندارد</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCourseType('internship');
+                    if (!editingCourseId) {
+                      setCategory('کارآموزی و ورود به بازار کار');
+                      if (!title) setTitle('دوره کارآموزی توسعه وب و ورود به بازار کار');
+                      if (!partnerCompany) setPartnerCompany('شرکت توسعه فناوری آکادمی');
+                    }
+                  }}
+                  className={`flex-1 py-2 rounded-lg font-bold text-xs transition-all flex items-center justify-center gap-1.5 ${
+                    courseType === 'internship'
+                      ? 'bg-purple-600 text-white shadow-sm'
+                      : 'text-purple-600 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-950/30'
+                  }`}
+                >
+                  <Briefcase className="w-4 h-4" />
+                  <span>🎓 دوره کارآموزی و ورود به بازار کار</span>
+                </button>
+              </div>
+
+              {/* Internship Specific Highlight Box */}
+              {courseType === 'internship' && (
+                <div className="p-3.5 bg-purple-50/70 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-800/80 rounded-2xl space-y-3 animate-fade-in">
+                  <div className="flex items-center gap-2 text-purple-900 dark:text-purple-200 font-bold">
+                    <Award className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                    <span>مشخصات اختصاصی دوره کارآموزی و اشتغال:</span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[11px] text-purple-900 dark:text-purple-300 font-bold mb-1">
+                        شرکت / سازمان محل کارآموزی *
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="مثلاً: شرکت داده‌ورزی نوین یا استودیو فناوری آکادمی"
+                        value={partnerCompany}
+                        onChange={e => setPartnerCompany(e.target.value)}
+                        required={courseType === 'internship'}
+                        className="w-full bg-white dark:bg-slate-900 border border-purple-200 dark:border-purple-700 rounded-xl p-2.5 outline-none text-xs"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] text-purple-900 dark:text-purple-300 font-bold mb-1">
+                        منتور و سرپرست کارآموزی *
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="مثلاً: مهندس رضایی یا استاد مسئول پروژه"
+                        value={mentorName}
+                        onChange={e => setMentorName(e.target.value)}
+                        required={courseType === 'internship'}
+                        className="w-full bg-white dark:bg-slate-900 border border-purple-200 dark:border-purple-700 rounded-xl p-2.5 outline-none text-xs"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[11px] text-purple-900 dark:text-purple-300 font-bold mb-1">
+                        وضعیت مالی دوره کارآموزی
+                      </label>
+                      <select
+                        value={stipendOrTuitionType}
+                        onChange={e => setStipendOrTuitionType(e.target.value as any)}
+                        className="w-full bg-white dark:bg-slate-900 border border-purple-200 dark:border-purple-700 rounded-xl p-2.5 outline-none text-xs font-bold"
+                      >
+                        <option value="stipend_paid">پرداخت کمک‌هزینه ماهیانه به کارآموز</option>
+                        <option value="free">کاملاً رایگان (بورسیه کامل آکادمی)</option>
+                        <option value="tuition_fee">دریافت شهریه دوره کارآموزی</option>
+                      </select>
+                    </div>
+
+                    {stipendOrTuitionType === 'stipend_paid' && (
+                      <div>
+                        <label className="block text-[11px] text-purple-900 dark:text-purple-300 font-bold mb-1">
+                          مبلغ کمک‌هزینه به کارآموز (تومان)
+                        </label>
+                        <FormattedCurrencyInput
+                          value={stipendAmount}
+                          onChange={setStipendAmount}
+                          unit="تومان"
+                        />
+                      </div>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] text-purple-900 dark:text-purple-300 font-bold mb-1">
+                      شرح تسک‌ها و مهارت‌های پروژه کارآموزی
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="مثلاً: توسعه فرانت‌اند، اتصال به API، تست باگ‌ها، مشارکت در جلسات اسکرام"
+                      value={internshipTasks}
+                      onChange={e => setInternshipTasks(e.target.value)}
+                      className="w-full bg-white dark:bg-slate-900 border border-purple-200 dark:border-purple-700 rounded-xl p-2.5 outline-none text-xs"
+                    />
+                  </div>
+
+                  <label className="flex items-center gap-2 cursor-pointer pt-1">
+                    <input
+                      type="checkbox"
+                      checked={certificateEligibility}
+                      onChange={e => setCertificateEligibility(e.target.checked)}
+                      className="rounded text-purple-600 w-4 h-4"
+                    />
+                    <span className="text-[11px] font-bold text-purple-900 dark:text-purple-200">
+                      اعطای گواهی رسمی پایان دوره کارآموزی و معرفی مستقیم به استخدام
+                    </span>
+                  </label>
+                </div>
+              )}
+
               {/* Course Title and Automated Unique Code */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div className="sm:col-span-2">
                   <label className="block text-slate-700 dark:text-slate-300 mb-1 font-bold">
-                    عنوان دوره آموزشی * <span className="text-[10px] font-normal text-rose-500">(کلاس هم‌نام مجاز نیست)</span>
+                    {courseType === 'internship' ? 'عنوان دوره کارآموزی *' : 'عنوان دوره آموزشی *'} <span className="text-[10px] font-normal text-rose-500">(کلاس هم‌نام مجاز نیست)</span>
                   </label>
                   <input
                     type="text"
-                    placeholder="مثلاً برنامه‌نویسی پایتون مقدماتی تا پیشرفته"
+                    placeholder={courseType === 'internship' ? 'مثلاً: دوره کارآموزی فرانت‌اند ری‌اکت و نکست' : 'مثلاً برنامه‌نویسی پایتون مقدماتی تا پیشرفته'}
                     value={title}
                     onChange={e => {
                       setTitle(e.target.value);

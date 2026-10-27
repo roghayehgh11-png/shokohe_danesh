@@ -31,7 +31,11 @@ import {
   Download,
   ExternalLink,
   X,
-  FileCheck
+  FileCheck,
+  PhoneCall,
+  PhoneForwarded,
+  Plus,
+  History
 } from 'lucide-react';
 
 export const UserManagementModule: React.FC = () => {
@@ -49,6 +53,7 @@ export const UserManagementModule: React.FC = () => {
     deleteCustomerLead,
     updateLeadStatus,
     addLeadNote,
+    addLeadCallLog,
     convertLeadToStudent
   } = useApp();
 
@@ -91,6 +96,10 @@ export const UserManagementModule: React.FC = () => {
   const [leadDuplicateError, setLeadDuplicateError] = useState<string | null>(null);
   const [leadName, setLeadName] = useState('');
   const [leadPhone, setLeadPhone] = useState('');
+  const [leadPhones, setLeadPhones] = useState<Array<{ id: string; label: string; number: string }>>([]);
+  const [leadReferralDate, setLeadReferralDate] = useState<string>(new Date().toLocaleDateString('fa-IR'));
+  const [leadLastCallDate, setLeadLastCallDate] = useState<string>('');
+  const [leadInitialCallNote, setLeadInitialCallNote] = useState<string>('');
   const [leadEmail, setLeadEmail] = useState('');
   const [leadCity, setLeadCity] = useState('مشهد');
   const [leadOccupation, setLeadOccupation] = useState('');
@@ -98,6 +107,27 @@ export const UserManagementModule: React.FC = () => {
   const [leadSource, setLeadSource] = useState<string>('معرفی دوستان');
   const [crmSourceFilter, setCrmSourceFilter] = useState<string>('all');
   const [crmAnalyticsScope, setCrmAnalyticsScope] = useState<'crm_only' | 'all'>('crm_only');
+
+  // Quick Call Log Modal State
+  const [callModalLead, setCallModalLead] = useState<CustomerLead | null>(null);
+  const [quickCallDate, setQuickCallDate] = useState<string>(new Date().toLocaleDateString('fa-IR'));
+  const [quickCallResult, setQuickCallResult] = useState<string>('پاسخ داد و علاقه‌مند بود');
+  const [quickCallNote, setQuickCallNote] = useState<string>('');
+
+  // AI CRM Advisor Modal State
+  const [aiModalLead, setAiModalLead] = useState<CustomerLead | null>(null);
+  const [isAiLoading, setIsAiLoading] = useState(false);
+  const [aiAnalysis, setAiAnalysis] = useState<{
+    conversionLikelihood?: string;
+    summary?: string;
+    recommendedCourses?: string[];
+    talkingPoints?: string[];
+    nextAction?: string;
+  } | null>(null);
+  const [aiError, setAiError] = useState<string | null>(null);
+
+  // View Call History Modal State
+  const [viewHistoryLead, setViewHistoryLead] = useState<CustomerLead | null>(null);
 
   // Convert Lead Modal state
   const [selectedLead, setSelectedLead] = useState<CustomerLead | null>(null);
@@ -446,6 +476,10 @@ export const UserManagementModule: React.FC = () => {
       setEditingLeadId(lead.id);
       setLeadName(lead.fullName);
       setLeadPhone(lead.phone);
+      setLeadPhones(lead.phones ? [...lead.phones] : []);
+      setLeadReferralDate(lead.referralDate || lead.createdAt || new Date().toLocaleDateString('fa-IR'));
+      setLeadLastCallDate(lead.lastCallDate || '');
+      setLeadInitialCallNote('');
       setLeadEmail(lead.email || '');
       setLeadCity(lead.city || 'مشهد');
       setLeadOccupation(lead.occupation || '');
@@ -455,6 +489,10 @@ export const UserManagementModule: React.FC = () => {
       setEditingLeadId(null);
       setLeadName('');
       setLeadPhone('');
+      setLeadPhones([]);
+      setLeadReferralDate(new Date().toLocaleDateString('fa-IR'));
+      setLeadLastCallDate(new Date().toLocaleDateString('fa-IR'));
+      setLeadInitialCallNote('');
       setLeadEmail('');
       setLeadCity('مشهد');
       setLeadOccupation('');
@@ -462,6 +500,21 @@ export const UserManagementModule: React.FC = () => {
       setLeadSource('معرفی دوستان');
     }
     setIsLeadModalOpen(true);
+  };
+
+  const handleAddExtraPhone = () => {
+    setLeadPhones([
+      ...leadPhones,
+      { id: 'phone-' + Date.now(), label: 'موبایل دوم', number: '' }
+    ]);
+  };
+
+  const handleRemoveExtraPhone = (id: string) => {
+    setLeadPhones(leadPhones.filter(p => p.id !== id));
+  };
+
+  const handleUpdateExtraPhone = (id: string, field: 'label' | 'number', val: string) => {
+    setLeadPhones(leadPhones.map(p => (p.id === id ? { ...p, [field]: val } : p)));
   };
 
   const handleSaveLead = (e: React.FormEvent) => {
@@ -475,10 +528,15 @@ export const UserManagementModule: React.FC = () => {
       return;
     }
 
+    const cleanedExtraPhones = leadPhones.filter(p => p.number.trim());
+
     if (editingLeadId) {
       updateCustomerLead(editingLeadId, {
         fullName: leadName.trim(),
         phone: leadPhone.trim(),
+        phones: cleanedExtraPhones,
+        referralDate: leadReferralDate.trim() || undefined,
+        lastCallDate: leadLastCallDate.trim() || undefined,
         email: leadEmail.trim() || undefined,
         city: leadCity.trim() || undefined,
         occupation: leadOccupation.trim() || undefined,
@@ -486,15 +544,31 @@ export const UserManagementModule: React.FC = () => {
         referralSource: leadSource
       });
     } else {
+      const initialLogs = leadInitialCallNote.trim()
+        ? [
+            {
+              id: 'call-' + Date.now(),
+              date: leadLastCallDate.trim() || leadReferralDate.trim() || new Date().toLocaleDateString('fa-IR'),
+              callerName: currentUser?.name || 'کارشناس پذیرش',
+              result: 'تماس اولیه ثبت شد',
+              note: leadInitialCallNote.trim()
+            }
+          ]
+        : [];
+
       addCustomerLead({
         fullName: leadName.trim(),
         phone: leadPhone.trim(),
+        phones: cleanedExtraPhones,
+        referralDate: leadReferralDate.trim() || new Date().toLocaleDateString('fa-IR'),
+        lastCallDate: leadLastCallDate.trim() || undefined,
+        callLogs: initialLogs,
         email: leadEmail.trim() || undefined,
         city: leadCity.trim() || undefined,
         occupation: leadOccupation.trim() || undefined,
         interestedCourseCategory: leadCourseCat,
         referralSource: leadSource,
-        assignedConsultant: 'مدیر کل'
+        assignedConsultant: currentUser?.name || 'مدیر کل'
       });
     }
 
@@ -502,6 +576,74 @@ export const UserManagementModule: React.FC = () => {
     setEditingLeadId(null);
     setLeadName('');
     setLeadPhone('');
+    setLeadPhones([]);
+    setLeadInitialCallNote('');
+  };
+
+  const handleOpenQuickCallModal = (lead: CustomerLead) => {
+    setCallModalLead(lead);
+    setQuickCallDate(new Date().toLocaleDateString('fa-IR'));
+    setQuickCallResult('پاسخ داد و علاقه‌مند بود');
+    setQuickCallNote('');
+  };
+
+  const handleSaveQuickCall = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!callModalLead) return;
+
+    addLeadCallLog(callModalLead.id, {
+      id: 'call-' + Date.now(),
+      date: quickCallDate.trim() || new Date().toLocaleDateString('fa-IR'),
+      callerName: currentUser?.name || 'کارشناس پذیرش',
+      result: quickCallResult,
+      note: quickCallNote.trim() || undefined
+    });
+
+    setCallModalLead(null);
+  };
+
+  const handleTriggerAiAnalysis = async (lead: CustomerLead) => {
+    setAiModalLead(lead);
+    setIsAiLoading(true);
+    setAiAnalysis(null);
+    setAiError(null);
+
+    try {
+      const resp = await fetch('/api/gemini/crm-assistant', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          lead: {
+            fullName: lead.fullName,
+            phone: lead.phone,
+            interestedCourseCategory: lead.interestedCourseCategory,
+            referralSource: lead.referralSource,
+            city: lead.city,
+            occupation: lead.occupation,
+            notes: lead.notes,
+            callLogs: lead.callLogs,
+            status: lead.status
+          },
+          availableCourses: courses.map(c => ({
+            id: c.id,
+            title: c.title,
+            category: c.category,
+            courseType: c.courseType || 'academic'
+          }))
+        })
+      });
+
+      const resData = await resp.json();
+      if (resData.success && resData.data) {
+        setAiAnalysis(resData.data);
+      } else {
+        setAiError(resData.error || 'خطا در دریافت تحلیل هوشمند.');
+      }
+    } catch (err: any) {
+      setAiError(err.message || 'ارتباط با سرویس هوش مصنوعی برقرار نشد.');
+    } finally {
+      setIsAiLoading(false);
+    }
   };
 
   const handleConfirmConvert = () => {
@@ -878,11 +1020,12 @@ export const UserManagementModule: React.FC = () => {
                 <thead className="bg-slate-50 dark:bg-slate-800/80 text-slate-500 font-bold">
                   <tr>
                     <th className="p-3">نام متقاضی</th>
-                    <th className="p-3">شماره تماس</th>
+                    <th className="p-3">شماره‌های تماس</th>
+                    <th className="p-3">تاریخ مراجعه و آخرین تماس</th>
                     <th className="p-3">دوره مورد علاقه</th>
                     <th className="p-3">کانال آشنایی</th>
                     <th className="p-3">وضعیت CRM</th>
-                    <th className="p-3 text-center">تبدیل به دانشجو / عملیات</th>
+                    <th className="p-3 text-center">تماس / هوش مصنوعی / تبدیل</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -894,8 +1037,65 @@ export const UserManagementModule: React.FC = () => {
                     })
                     .map(lead => (
                     <tr key={lead.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/50 transition-colors">
-                      <td className="p-3 font-bold text-slate-900 dark:text-white">{lead.fullName}</td>
-                      <td className="p-3 font-mono text-slate-600 dark:text-slate-300">{lead.phone}</td>
+                      <td className="p-3 font-bold text-slate-900 dark:text-white">
+                        <div>{lead.fullName}</div>
+                        {lead.city && <span className="text-[10px] text-slate-400 font-normal">{lead.city}</span>}
+                      </td>
+
+                      {/* Phone Numbers Column */}
+                      <td className="p-3">
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-1 font-mono font-bold text-slate-700 dark:text-slate-200">
+                            <Phone className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                            <span>{lead.phone}</span>
+                            <span className="text-[9px] px-1 py-0.2 bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-blue-400 rounded">اصلی</span>
+                          </div>
+                          {lead.phones && lead.phones.length > 0 && (
+                            <div className="flex flex-wrap gap-1 pt-0.5">
+                              {lead.phones.map(p => (
+                                <span
+                                  key={p.id}
+                                  className="inline-flex items-center gap-1 text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 px-1.5 py-0.5 rounded-md border border-slate-200 dark:border-slate-700 font-mono"
+                                >
+                                  <span className="text-slate-400 font-sans">{p.label}:</span>
+                                  <span>{p.number}</span>
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </td>
+
+                      {/* Dates Column */}
+                      <td className="p-3">
+                        <div className="space-y-1 text-[11px]">
+                          <div className="flex items-center gap-1.5 text-slate-600 dark:text-slate-300" title="تاریخ ثبت مراجعه">
+                            <Calendar className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                            <span>مراجعه:</span>
+                            <span className="font-mono font-bold text-slate-800 dark:text-slate-200">
+                              {lead.referralDate || lead.createdAt || 'نامشخص'}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-1.5 text-slate-500" title="تاریخ آخرین تماس">
+                            <PhoneCall className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                            <span>آخرین تماس:</span>
+                            <span className="font-mono font-medium text-slate-700 dark:text-slate-300">
+                              {lead.lastCallDate || 'هنوز ثبت نشده'}
+                            </span>
+                          </div>
+                          {lead.callLogs && lead.callLogs.length > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => setViewHistoryLead(lead)}
+                              className="inline-flex items-center gap-1 text-[10px] text-blue-600 dark:text-blue-400 hover:underline pt-0.5"
+                            >
+                              <History className="w-3 h-3" />
+                              <span>{lead.callLogs.length} تماس ثبت شده (مشاهده تاریخچه)</span>
+                            </button>
+                          )}
+                        </div>
+                      </td>
+
                       <td className="p-3 text-blue-600 dark:text-blue-400 font-medium">{lead.interestedCourseCategory}</td>
                       <td className="p-3 text-slate-500">{lead.referralSource}</td>
                       <td className="p-3">
@@ -928,8 +1128,32 @@ export const UserManagementModule: React.FC = () => {
                         )}
                       </td>
 
+                      {/* Actions Column */}
                       <td className="p-3">
-                        <div className="flex items-center justify-center gap-1.5">
+                        <div className="flex flex-wrap items-center justify-center gap-1.5">
+                          {/* Quick Call Log Button */}
+                          <button
+                            type="button"
+                            onClick={() => handleOpenQuickCallModal(lead)}
+                            className="px-2 py-1 bg-amber-50 dark:bg-amber-950/60 hover:bg-amber-100 text-amber-700 dark:text-amber-300 border border-amber-300 dark:border-amber-700 font-bold text-[11px] rounded-lg transition-all flex items-center gap-1 shadow-xs"
+                            title="ثبت تماس تلفنی جدید"
+                          >
+                            <PhoneForwarded className="w-3.5 h-3.5" />
+                            <span>ثبت تماس</span>
+                          </button>
+
+                          {/* AI Assistant Button */}
+                          <button
+                            type="button"
+                            onClick={() => handleTriggerAiAnalysis(lead)}
+                            className="px-2 py-1 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold text-[11px] rounded-lg shadow-sm transition-all flex items-center gap-1"
+                            title="تحلیل هوشمند تبدیل و پیشنهاد سرفصل با هوش مصنوعی"
+                          >
+                            <Sparkles className="w-3.5 h-3.5" />
+                            <span>تحلیل AI</span>
+                          </button>
+
+                          {/* Convert to Student */}
                           {lead.status !== 'enrolled' && (
                             <button
                               onClick={() => {
@@ -940,16 +1164,17 @@ export const UserManagementModule: React.FC = () => {
                               title="تبدیل ۱ کلیک به دانشجو"
                             >
                               <UserCheck className="w-3.5 h-3.5" />
-                              تبدیل به دانشجو
+                              <span>ثبت‌نام</span>
                             </button>
                           )}
                           {lead.status === 'enrolled' && (
-                            <span className="text-emerald-600 font-bold text-[11px] px-2">✔ ثبت‌نام شده</span>
+                            <span className="text-emerald-600 font-bold text-[11px] px-1">✔ دانشجو</span>
                           )}
+
                           <button
                             onClick={() => handleOpenLeadModal(lead)}
                             className="p-1.5 text-slate-400 hover:text-blue-600 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
-                            title="ویرایش متقاضی"
+                            title="ویرایش پرونده"
                           >
                             <Edit className="w-3.5 h-3.5" />
                           </button>
@@ -960,7 +1185,7 @@ export const UserManagementModule: React.FC = () => {
                               }
                             }}
                             className="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
-                            title="حذف متقاضی"
+                            title="حذف پرونده"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
                           </button>
@@ -1472,12 +1697,14 @@ export const UserManagementModule: React.FC = () => {
         </div>
       )}
 
-      {/* Modal 4: CRM Lead Add */}
+      {/* Modal 4: CRM Lead Add/Edit */}
       {isLeadModalOpen && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 overflow-y-auto p-3 sm:p-6 flex items-start sm:items-center justify-center">
-          <div className="bg-white dark:bg-slate-900 rounded-2xl max-w-md w-full p-6 border border-slate-200 dark:border-slate-800 shadow-2xl max-h-[90vh] flex flex-col my-auto animate-scale-up">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl max-w-lg w-full p-5 sm:p-6 border border-slate-200 dark:border-slate-800 shadow-2xl max-h-[90vh] flex flex-col my-auto animate-scale-up">
             <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3 shrink-0">
-              <h3 className="font-bold text-base text-slate-900 dark:text-white">ثبت پرونده مشتری جدید در CRM</h3>
+              <h3 className="font-bold text-base text-slate-900 dark:text-white">
+                {editingLeadId ? 'ویرایش پرونده مشتری در CRM' : 'ثبت پرونده مشتری جدید در CRM'}
+              </h3>
               <button
                 type="button"
                 onClick={() => setIsLeadModalOpen(false)}
@@ -1489,35 +1716,178 @@ export const UserManagementModule: React.FC = () => {
             </div>
 
             <form onSubmit={handleSaveLead} className="flex-1 min-h-0 overflow-y-auto overscroll-contain py-3 pr-1 pl-1 space-y-3.5 text-xs">
-              <div>
-                <label className="block text-slate-600 dark:text-slate-300 mb-1">نام متقاضی</label>
-                <input
-                  type="text"
-                  value={leadName}
-                  onChange={e => setLeadName(e.target.value)}
-                  required
-                  className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-2.5 outline-none text-slate-800 dark:text-white"
-                />
+              {leadDuplicateError && (
+                <div className="p-3 bg-rose-50 dark:bg-rose-950/60 border border-rose-300 dark:border-rose-800 rounded-xl text-rose-800 dark:text-rose-200 text-xs font-bold flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
+                  <span>{leadDuplicateError}</span>
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-600 dark:text-slate-300 mb-1 font-bold">نام و نام خانوادگی متقاضی *</label>
+                  <input
+                    type="text"
+                    value={leadName}
+                    onChange={e => setLeadName(e.target.value)}
+                    required
+                    placeholder="مثلاً: سارا حسینی"
+                    className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-2.5 outline-none text-slate-800 dark:text-white font-medium"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-slate-600 dark:text-slate-300 mb-1 font-bold">شماره تماس اصلی (همراه) *</label>
+                  <input
+                    type="text"
+                    value={leadPhone}
+                    onChange={e => setLeadPhone(e.target.value)}
+                    required
+                    placeholder="0912..."
+                    className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-2.5 font-mono outline-none text-slate-800 dark:text-white"
+                  />
+                </div>
+              </div>
+
+              {/* Extra Phone Numbers Repeater */}
+              <div className="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200/80 dark:border-slate-700/80 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                    <Phone className="w-3.5 h-3.5 text-blue-500" />
+                    <span>شماره‌های تماس تکمیلی (چند شماره برای یک نفر):</span>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleAddExtraPhone}
+                    className="px-2.5 py-1 bg-blue-100 hover:bg-blue-200 dark:bg-blue-900/50 dark:hover:bg-blue-800 text-blue-700 dark:text-blue-300 rounded-lg text-[11px] font-bold transition-all flex items-center gap-1"
+                  >
+                    <Plus className="w-3 h-3" />
+                    <span>افزودن شماره دیگر</span>
+                  </button>
+                </div>
+
+                {leadPhones.length === 0 ? (
+                  <p className="text-[11px] text-slate-400">
+                    برای این متقاضی هنوز شماره دومی (مثل شماره بله، ایتا، منزل یا والدین) ثبت نشده است. با دکمه بالا می‌توانید شماره‌های دیگر را ثبت کنید.
+                  </p>
+                ) : (
+                  <div className="space-y-2 pt-1">
+                    {leadPhones.map((p, idx) => (
+                      <div key={p.id} className="flex items-center gap-2 bg-white dark:bg-slate-900 p-2 rounded-xl border border-slate-200 dark:border-slate-700">
+                        <select
+                          value={p.label}
+                          onChange={e => handleUpdateExtraPhone(p.id, 'label', e.target.value)}
+                          className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-1.5 text-slate-700 dark:text-slate-200 text-[11px] font-bold outline-none shrink-0"
+                        >
+                          <option value="موبایل دوم">موبایل دوم</option>
+                          <option value="پیام‌رسان بله">پیام‌رسان بله</option>
+                          <option value="پیام‌رسان ایتا">پیام‌رسان ایتا</option>
+                          <option value="تلفن ثابت منزل">تلفن ثابت منزل</option>
+                          <option value="تلفن محل کار">تلفن محل کار</option>
+                          <option value="شماره والدین/معرف">شماره والدین/معرف</option>
+                          <option value="تلگرام/واتساپ">تلگرام/واتساپ</option>
+                          <option value="سایر">سایر</option>
+                        </select>
+                        <input
+                          type="text"
+                          value={p.number}
+                          onChange={e => handleUpdateExtraPhone(p.id, 'number', e.target.value)}
+                          placeholder="شماره تماس..."
+                          className="flex-1 bg-transparent border-0 outline-none font-mono text-slate-800 dark:text-white text-xs"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveExtraPhone(p.id)}
+                          className="p-1 text-slate-400 hover:text-rose-600 rounded-lg transition-colors"
+                          title="حذف این شماره"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Referral & Last Call Dates */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 bg-blue-50/40 dark:bg-blue-950/20 rounded-xl border border-blue-100 dark:border-blue-900/40">
+                <div>
+                  <label className="block text-slate-700 dark:text-slate-300 mb-1 font-bold flex items-center gap-1">
+                    <Calendar className="w-3.5 h-3.5 text-emerald-500" />
+                    <span>تاریخ ثبت مراجعه حضوری / ورود:</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={leadReferralDate}
+                    onChange={e => setLeadReferralDate(e.target.value)}
+                    placeholder="مثلاً: 1403/08/05"
+                    className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl p-2 font-mono outline-none text-slate-800 dark:text-white text-xs"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-slate-700 dark:text-slate-300 mb-1 font-bold flex items-center gap-1">
+                    <PhoneCall className="w-3.5 h-3.5 text-amber-500" />
+                    <span>تاریخ آخرین تماس تلفنی:</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={leadLastCallDate}
+                    onChange={e => setLeadLastCallDate(e.target.value)}
+                    placeholder="مثلاً: 1403/08/05"
+                    className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl p-2 font-mono outline-none text-slate-800 dark:text-white text-xs"
+                  />
+                </div>
+              </div>
+
+              {!editingLeadId && (
+                <div>
+                  <label className="block text-slate-600 dark:text-slate-300 mb-1 font-bold">
+                    نتیجه / یادداشت اولین تماس (اختیاری)
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={leadInitialCallNote}
+                    onChange={e => setLeadInitialCallNote(e.target.value)}
+                    placeholder="خلاصه مکالمه اولیه یا درخواست متقاضی..."
+                    className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-2.5 outline-none text-slate-800 dark:text-white text-xs"
+                  />
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-600 dark:text-slate-300 mb-1">شهر سکونت</label>
+                  <input
+                    type="text"
+                    value={leadCity}
+                    onChange={e => setLeadCity(e.target.value)}
+                    placeholder="مشهد"
+                    className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-2.5 outline-none text-slate-800 dark:text-white"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-slate-600 dark:text-slate-300 mb-1">شغل / وضعیت تحصیلی</label>
+                  <input
+                    type="text"
+                    value={leadOccupation}
+                    onChange={e => setLeadOccupation(e.target.value)}
+                    placeholder="مثلاً: دانشجو، آزاد..."
+                    className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-2.5 outline-none text-slate-800 dark:text-white"
+                  />
+                </div>
               </div>
 
               <div>
-                <label className="block text-slate-600 dark:text-slate-300 mb-1">شماره تماس همراه</label>
-                <input
-                  type="text"
-                  value={leadPhone}
-                  onChange={e => setLeadPhone(e.target.value)}
-                  required
-                  className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-2.5 font-mono outline-none text-slate-800 dark:text-white"
-                />
-              </div>
-
-              <div>
-                <label className="block text-slate-600 dark:text-slate-300 mb-1">دوره مورد علاقه</label>
+                <label className="block text-slate-600 dark:text-slate-300 mb-1 font-bold">دوره مورد علاقه</label>
                 <EditableSelect
                   value={leadCourseCat}
                   onChange={val => setLeadCourseCat(val)}
                   options={[
                     { value: 'برنامه‌نویسی پایتون', label: 'برنامه‌نویسی پایتون' },
+                    { value: 'دوره کارآموزی برنامه‌نویسی و وب', label: 'دوره کارآموزی برنامه‌نویسی و وب' },
+                    { value: 'دوره کارآموزی هوش مصنوعی و داده', label: 'دوره کارآموزی هوش مصنوعی و داده' },
                     { value: 'طراحی سایت و وردپرس', label: 'طراحی سایت و وردپرس' },
                     { value: 'فرانت‌اند ری‌اکت', label: 'فرانت‌اند ری‌اکت' },
                     { value: 'هوش مصنوعی و یادگیری ماشین', label: 'هوش مصنوعی و یادگیری ماشین' },
@@ -1529,7 +1899,7 @@ export const UserManagementModule: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-slate-600 dark:text-slate-300 mb-1">کانال آشنایی (Referral Source)</label>
+                <label className="block text-slate-600 dark:text-slate-300 mb-1 font-bold">کانال آشنایی (Referral Source)</label>
                 <EditableSelect
                   id="lead_source_select"
                   storageKey="crm_referral_sources"
@@ -1557,7 +1927,7 @@ export const UserManagementModule: React.FC = () => {
                   type="submit"
                   className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl shadow"
                 >
-                  ثبت پرونده
+                  {editingLeadId ? 'ذخیره تغییرات پرونده' : 'ثبت پرونده در CRM'}
                 </button>
                 <button
                   type="button"
@@ -1568,6 +1938,314 @@ export const UserManagementModule: React.FC = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal 5: Quick Call Log */}
+      {callModalLead && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 overflow-y-auto p-3 sm:p-6 flex items-start sm:items-center justify-center">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl max-w-md w-full p-6 border border-slate-200 dark:border-slate-800 shadow-2xl max-h-[90vh] flex flex-col my-auto animate-scale-up">
+            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3 shrink-0">
+              <h3 className="font-bold text-base text-slate-900 dark:text-white flex items-center gap-2">
+                <PhoneCall className="w-5 h-5 text-amber-500" />
+                ثبت تماس با {callModalLead.fullName}
+              </h3>
+              <button
+                type="button"
+                onClick={() => setCallModalLead(null)}
+                className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                title="بستن"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveQuickCall} className="flex-1 min-h-0 overflow-y-auto py-3 space-y-3.5 text-xs">
+              <div className="p-3 bg-amber-50/60 dark:bg-amber-950/30 rounded-xl border border-amber-200 dark:border-amber-800 text-amber-900 dark:text-amber-200 space-y-1">
+                <div className="flex justify-between items-center">
+                  <span className="font-bold">شماره تماس اصلی:</span>
+                  <span className="font-mono font-bold">{callModalLead.phone}</span>
+                </div>
+                {callModalLead.phones && callModalLead.phones.length > 0 && (
+                  <div className="pt-1 text-[11px] space-y-0.5 border-t border-amber-200/60 dark:border-amber-800/60">
+                    <span className="text-slate-500">سایر شماره‌ها:</span>
+                    <div className="flex flex-wrap gap-1 mt-0.5">
+                      {callModalLead.phones.map(p => (
+                        <span key={p.id} className="bg-white dark:bg-slate-900 px-1.5 py-0.5 rounded border border-amber-300 dark:border-amber-700 font-mono text-[10px]">
+                          {p.label}: {p.number}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-slate-600 dark:text-slate-300 mb-1 font-bold">تاریخ تماس تلفنی</label>
+                <input
+                  type="text"
+                  value={quickCallDate}
+                  onChange={e => setQuickCallDate(e.target.value)}
+                  placeholder="1403/08/05"
+                  className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-2.5 font-mono outline-none text-slate-800 dark:text-white"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-600 dark:text-slate-300 mb-1 font-bold">نتیجه تماس</label>
+                <select
+                  value={quickCallResult}
+                  onChange={e => setQuickCallResult(e.target.value)}
+                  className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-2.5 outline-none text-slate-800 dark:text-white font-medium"
+                >
+                  <option value="پاسخ داد و علاقه‌مند بود">پاسخ داد و بسیار علاقه‌مند بود</option>
+                  <option value="عدم پاسخگویی (بوق خورد)">عدم پاسخگویی (بوق خورد - نیاز به تماس مجدد)</option>
+                  <option value="در دسترس نبود یا خاموش">در دسترس نبود یا تلفن خاموش</option>
+                  <option value="درخواست تماس در ساعت دیگر">درخواست تماس در ساعتی دیگر</option>
+                  <option value="هماهنگی برای مشاوره حضوری">هماهنگی برای مشاوره حضوری در آکادمی</option>
+                  <option value="درخواست تخفیف یا شرایط اقساط">درخواست تخفیف یا شرایط اقساط</option>
+                  <option value="تصمیم‌گیری با خانواده">در حال مشورت با والدین / خانواده</option>
+                  <option value="انصراف قطعی">انصراف قطعی</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-slate-600 dark:text-slate-300 mb-1 font-bold">یادداشت و جزئیات مکالمه</label>
+                <textarea
+                  rows={3}
+                  value={quickCallNote}
+                  onChange={e => setQuickCallNote(e.target.value)}
+                  placeholder="نکات مطرح شده، ترجیحات زمان کلاس، یا نیازهای مخاطب..."
+                  className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-2.5 outline-none text-slate-800 dark:text-white"
+                />
+              </div>
+
+              <div className="flex gap-2 pt-3 border-t border-slate-100 dark:border-slate-800 shrink-0">
+                <button
+                  type="submit"
+                  className="flex-1 py-2.5 bg-amber-600 hover:bg-amber-500 text-white font-bold rounded-xl shadow"
+                >
+                  ثبت تاریخچه تماس
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCallModalLead(null)}
+                  className="px-4 py-2.5 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-bold rounded-xl"
+                >
+                  انصراف
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal 6: AI CRM Advisor */}
+      {aiModalLead && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 overflow-y-auto p-3 sm:p-6 flex items-start sm:items-center justify-center animate-fade-in">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl max-w-lg w-full p-6 border border-purple-200 dark:border-purple-900/50 shadow-2xl max-h-[90vh] flex flex-col my-auto animate-scale-up">
+            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3 shrink-0">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-purple-600 to-indigo-600 text-white flex items-center justify-center shadow-md">
+                  <Sparkles className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-sm text-slate-900 dark:text-white">
+                    مشاور هوش مصنوعی CRM برای «{aiModalLead.fullName}»
+                  </h3>
+                  <p className="text-[10px] text-slate-400">
+                    تحلیل احتمال ثبت‌نام، پیشنهاد دوره‌ها/کارآموزی و نکات طلایی مذاکره
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setAiModalLead(null)}
+                className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                title="بستن"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="flex-1 min-h-0 overflow-y-auto py-4 space-y-4 text-xs">
+              {isAiLoading && (
+                <div className="py-10 text-center space-y-3">
+                  <div className="w-10 h-10 border-3 border-purple-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
+                  <p className="font-bold text-slate-700 dark:text-slate-300">در حال تحلیل سوابق و رفتار متقاضی با هوش مصنوعی...</p>
+                  <p className="text-[11px] text-slate-400">بررسی تاریخچه تماس‌ها، کانال آشنایی و تطبیق با دوره‌ها</p>
+                </div>
+              )}
+
+              {aiError && (
+                <div className="p-3 bg-rose-50 dark:bg-rose-950/60 border border-rose-300 dark:border-rose-800 rounded-xl text-rose-800 dark:text-rose-200 text-xs font-bold flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
+                  <span>{aiError}</span>
+                </div>
+              )}
+
+              {aiAnalysis && !isAiLoading && (
+                <div className="space-y-3.5">
+                  {/* Conversion Likelihood Card */}
+                  <div className="p-3.5 bg-gradient-to-r from-purple-50 to-indigo-50 dark:from-purple-950/40 dark:to-indigo-950/40 rounded-2xl border border-purple-200 dark:border-purple-800/60 flex items-center justify-between">
+                    <div>
+                      <span className="text-[11px] text-slate-500 dark:text-slate-400 block font-bold">احتمال تبدیل به دانشجو:</span>
+                      <span className="text-base font-extrabold text-purple-700 dark:text-purple-300">
+                        {aiAnalysis.conversionLikelihood || 'متوسط (۶۰٪)'}
+                      </span>
+                    </div>
+                    <div className="px-3 py-1 bg-white/80 dark:bg-slate-900/80 rounded-xl border border-purple-200 dark:border-purple-800 text-[11px] font-bold text-slate-700 dark:text-slate-200">
+                      دوره مدنظر: {aiModalLead.interestedCourseCategory}
+                    </div>
+                  </div>
+
+                  {/* Summary */}
+                  {aiAnalysis.summary && (
+                    <div className="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200/80 dark:border-slate-700/80 space-y-1">
+                      <span className="font-bold text-slate-700 dark:text-slate-200 block">ارزیابی وضعیت متقاضی:</span>
+                      <p className="text-slate-600 dark:text-slate-300 leading-relaxed text-[11px]">
+                        {aiAnalysis.summary}
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Recommended Courses */}
+                  {aiAnalysis.recommendedCourses && aiAnalysis.recommendedCourses.length > 0 && (
+                    <div className="space-y-1.5">
+                      <span className="font-bold text-slate-700 dark:text-slate-200 block">دوره‌ها و کلاس‌های پیشنهادی جهت معرفی:</span>
+                      <div className="flex flex-wrap gap-1.5">
+                        {aiAnalysis.recommendedCourses.map((c, i) => (
+                          <span
+                            key={i}
+                            className="px-2.5 py-1 bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 rounded-lg text-[11px] font-bold"
+                          >
+                            ⭐ {c}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Talking points */}
+                  {aiAnalysis.talkingPoints && aiAnalysis.talkingPoints.length > 0 && (
+                    <div className="space-y-1.5">
+                      <span className="font-bold text-slate-700 dark:text-slate-200 block">نکات کلیدی برای مشاور در تماس بعدی:</span>
+                      <ul className="space-y-1 bg-emerald-50/50 dark:bg-emerald-950/30 p-3 rounded-xl border border-emerald-200 dark:border-emerald-800/50">
+                        {aiAnalysis.talkingPoints.map((tp, i) => (
+                          <li key={i} className="text-emerald-900 dark:text-emerald-200 text-[11px] flex items-start gap-1.5">
+                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5" />
+                            <span>{tp}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {/* Next Action */}
+                  {aiAnalysis.nextAction && (
+                    <div className="p-3 bg-amber-50 dark:bg-amber-950/40 rounded-xl border border-amber-200 dark:border-amber-800 text-[11px] space-y-0.5">
+                      <span className="font-bold text-amber-900 dark:text-amber-200 block">اقدام پیشنهادی بعدی:</span>
+                      <p className="text-amber-800 dark:text-amber-300 font-medium">{aiAnalysis.nextAction}</p>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div className="flex gap-2 pt-3 border-t border-slate-100 dark:border-slate-800 shrink-0">
+              <button
+                type="button"
+                onClick={() => {
+                  setCallModalLead(aiModalLead);
+                  setAiModalLead(null);
+                }}
+                className="flex-1 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold rounded-xl shadow text-xs flex items-center justify-center gap-1.5"
+              >
+                <PhoneForwarded className="w-4 h-4" />
+                <span>شروع و ثبت تماس با این متقاضی</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setAiModalLead(null)}
+                className="px-4 py-2 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-bold rounded-xl text-xs"
+              >
+                بستن
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal 7: View Call History */}
+      {viewHistoryLead && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 overflow-y-auto p-3 sm:p-6 flex items-start sm:items-center justify-center">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl max-w-md w-full p-6 border border-slate-200 dark:border-slate-800 shadow-2xl max-h-[90vh] flex flex-col my-auto animate-scale-up">
+            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3 shrink-0">
+              <h3 className="font-bold text-sm text-slate-900 dark:text-white flex items-center gap-2">
+                <History className="w-4 h-4 text-blue-500" />
+                تاریخچه تماس‌ها و پیگیری‌های «{viewHistoryLead.fullName}»
+              </h3>
+              <button
+                type="button"
+                onClick={() => setViewHistoryLead(null)}
+                className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                title="بستن"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="flex-1 min-h-0 overflow-y-auto py-3 space-y-3 text-xs">
+              {(!viewHistoryLead.callLogs || viewHistoryLead.callLogs.length === 0) ? (
+                <p className="text-slate-400 text-center py-6">هیچ تماسی تاکنون برای این پرونده ثبت نشده است.</p>
+              ) : (
+                <div className="space-y-2.5">
+                  {viewHistoryLead.callLogs.map((log, idx) => (
+                    <div key={log.id || idx} className="p-3 bg-slate-50 dark:bg-slate-800/70 rounded-xl border border-slate-200 dark:border-slate-700 space-y-1">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-blue-600 dark:text-blue-400 flex items-center gap-1">
+                          <PhoneCall className="w-3.5 h-3.5" />
+                          <span>{log.result}</span>
+                        </span>
+                        <span className="font-mono text-[10px] text-slate-500 bg-white dark:bg-slate-900 px-2 py-0.5 rounded border border-slate-200 dark:border-slate-700">
+                          {log.date}
+                        </span>
+                      </div>
+                      <div className="text-[11px] text-slate-500 flex justify-between pt-0.5">
+                        <span>کارشناس: {log.callerName}</span>
+                      </div>
+                      {log.note && (
+                        <p className="text-slate-700 dark:text-slate-300 text-[11px] bg-white dark:bg-slate-900/60 p-2 rounded-lg border border-slate-100 dark:border-slate-800 mt-1">
+                          {log.note}
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="flex gap-2 pt-3 border-t border-slate-100 dark:border-slate-800 shrink-0">
+              <button
+                type="button"
+                onClick={() => {
+                  setCallModalLead(viewHistoryLead);
+                  setViewHistoryLead(null);
+                }}
+                className="flex-1 py-2 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl shadow text-xs flex items-center justify-center gap-1.5"
+              >
+                <Plus className="w-4 h-4" />
+                <span>ثبت تماس جدید</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewHistoryLead(null)}
+                className="px-4 py-2 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-bold rounded-xl text-xs"
+              >
+                بستن
+              </button>
+            </div>
           </div>
         </div>
       )}

@@ -1,33 +1,33 @@
-/* ۱. ابتدا فراخوانی فونت از CDN (حتماً باید بالای import tailwind باشد) */
-@import url('https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-Variable-font-face.css');
-
-/* ۲. فراخوانی اصلی Tailwind CSS v4 */
 @import "tailwindcss";
 
 @custom-variant dark (&:where(.dark, .dark *));
 
-/* ۳. تنظیم فونت در Tailwind CSS v4 */
-@theme {
-  --font-sans: 'Vazirmatn', system-ui, -apple-system, sans-serif;
+@layer base {
+  :root {
+    font-family: 'Vazirmatn', 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'IranSans', 'Sahel', 'Samim', sans-serif;
+    font-feature-settings: 'cv01', 'ss01';
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  html, body, #root {
+    height: 100%;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    overflow-x: hidden;
+    font-family: inherit;
+    letter-spacing: -0.01em;
+  }
 }
 
-/* ۴. ریست و اعمال اجباری فونت روی کل عناصر */
-:root {
-  --default-font-family: 'Vazirmatn', system-ui, sans-serif !important;
+/* Smooth and responsive scrolling */
+* {
+  -webkit-overflow-scrolling: touch;
 }
 
-*, html, body, #root, button, input, select, textarea {
-  font-family: 'Vazirmatn', system-ui, -apple-system, BlinkMacSystemFont, sans-serif !important;
-}
-
-/* اصلاح ریسپونسیو تصاویر */
-img, video {
-  max-width: 100%;
-  height: auto;
-  display: block;
-}
-
-/* اسکرول‌بار سفارشی */
+/* Custom scrollbar for clean UI */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -45,3 +45,5 @@ img, video {
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(107, 114, 128, 0.6);
 }
+
+

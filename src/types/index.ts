@@ -60,7 +60,7 @@ export interface User {
   specialNotes?: string;
 }
 
-export type CourseCategory = 'scratch' | 'wordpress' | 'python' | 'seo' | 'programming' | 'icdl';
+export type CourseCategory = 'scratch' | 'wordpress' | 'python' | 'seo' | 'programming' | 'icdl' | 'internship' | string;
 
 export interface CourseMaterial {
   id: string;
@@ -93,6 +93,13 @@ export interface Course {
   code?: string; // کد اختصاصی و یکتای دوره شامل سال برگزاری و تاریخ شروع
   title: string;
   category: CourseCategory;
+  courseType?: 'academic' | 'internship'; // تفکیک دوره آموزشی عادی از دوره کارآموزی
+  partnerCompany?: string; // شرکت یا سازمان محل کارآموزی
+  mentorName?: string; // منتور و سرپرست اختصاصی دوره کارآموزی
+  stipendOrTuitionType?: 'free' | 'stipend_paid' | 'tuition_fee'; // وضعیت مالی دوره
+  stipendAmount?: number; // مبلغ کمک‌هزینه به کارآموز یا شهریه
+  internshipTasks?: string[]; // تسک‌ها و پروژه‌های کارآموزی
+  certificateEligibility?: boolean; // اعطای گواهی رسمی کارآموزی و اولویت استخدام
   teacherId: string;
   teacherName: string;
   capacity: number;
@@ -247,10 +254,26 @@ export interface ConsultationNote {
   note: string;
 }
 
+export interface LeadPhone {
+  id: string;
+  label: string; // e.g., 'موبایل اصلی', 'شماره دوم', 'تلفن منزل', 'محل کار', 'پیام‌رسان بله/ایتا', 'شماره معرف/ولی'
+  number: string;
+}
+
+export interface CallLogItem {
+  id: string;
+  date: string; // e.g., '1403/11/15'
+  time?: string; // e.g., '14:30'
+  callerName: string;
+  result: string; // 'موفق و ابراز تمایل', 'نیاز به پیگیری مجدد', 'پاسخگو نبود', 'مشاوره حضوری هماهنگ شد', 'انصراف قطعی'
+  note?: string;
+}
+
 export interface CustomerLead {
   id: string;
   fullName: string;
-  phone: string;
+  phone: string; // شماره اصلی جهت سازگاری
+  phones?: LeadPhone[]; // امکان ثبت چند شماره تماس برای یک نفر
   email: string;
   city: string;
   occupation: string;
@@ -260,6 +283,9 @@ export interface CustomerLead {
   cancellationReason?: string; // "بالا بودن شهریه", "عدم تطابق ساعت کلاس", "دوری مسافت", etc.
   notes: ConsultationNote[];
   visitDate: string;
+  referralDate?: string; // تاریخ ثبت مراجعه حضوری
+  lastCallDate?: string; // تاریخ آخرین تماس
+  callLogs?: CallLogItem[]; // سوابق و تاریخچه تماس‌های ثبت شده
   assignedConsultant: string;
   createdAt: string;
   convertedToStudentId?: string;
